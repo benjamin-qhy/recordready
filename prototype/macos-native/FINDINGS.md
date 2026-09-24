@@ -66,3 +66,25 @@ Apple M4 Pro / arm64，macOS 26.4；Swift 6.1.2、Command Line Tools SDK 15.5；
 ## 最新范围变更
 
 用户明确取消 30 分钟长录验证，不再作为本地图或第一期交付的门槛；此前“稍后补做”的记录由本决定覆盖。保留真实短录、连续录制与短录同步要求，长期漂移和稳定性维持未验证。此范围变更不等于其他待验证能力已经通过。
+
+## 当前显示模式与坐标诊断
+
+2026-09-24 运行新增 `DisplayDiagnostics.swift`，仅查询显示器属性，不截屏、不启动相机或麦克风。检测到一个内建显示器：
+
+| 字段 | 实测 |
+|---|---|
+| AppKit frame / CG 模式尺寸 | 1512×982 |
+| CGDisplayPixelsWide/High | 1512×982 |
+| CGDisplayMode.pixelWidth/pixelHeight | 3024×1964 |
+| NSScreen.backingScaleFactor | 2 |
+| 960×540 点区域经 convertRectToBacking | 1920×1080 后备像素 |
+
+旧 `displayPhysicalPixels` 命名不正确；后续日志改为 `cgDisplayReportedSize`，另记 `displayModeSize`、`displayModePixelSize`。不修改历史样片日志。当前模式像素不泛化为所有显示模式的物理面板分辨率，也不是实际 SCStream 缓冲区尺寸证据。
+
+原实验指定的 960×540 点区域在当前配置对应 1920×1080 后备像素，而输出固定 1280×720；这是配置层面的缩小映射。仍缺像素级标记对照及其他显示模式/外接屏验证，不能将此查询标记为完整 DPI 验收通过，更不能声称 12 个 UI 预设均能原生录制。
+
+运行：`xcrun swiftc prototype/macos-native/DisplayDiagnostics.swift -o /tmp/recordready-display-diagnostics && /tmp/recordready-display-diagnostics`。
+
+验证：诊断程序编译运行成功；`Main.swift` 在 Swift 5 模式 typecheck 通过，有两处现有 Sendable 捕获警告（App 的 setupQueue/Timer 闭包），未将其宣称为无警告构建。本轮未重签或重启原录制应用，保留现有授权状态。
+
+官方语义：[NSScreen.backingScaleFactor](https://developer.apple.com/documentation/appkit/nsscreen/backingscalefactor)、[CGDisplayMode](https://developer.apple.com/documentation/coregraphics/cgdisplaymode)。

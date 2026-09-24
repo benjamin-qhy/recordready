@@ -166,7 +166,12 @@ final class Engine: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDa
         metadata["os"] = ProcessInfo.processInfo.operatingSystemVersionString
         metadata["architecture"] = "arm64"
         metadata["displayLogicalSize"] = [display.width, display.height]
-        metadata["displayPhysicalPixels"] = [CGDisplayPixelsWide(displayID), CGDisplayPixelsHigh(displayID)]
+        // Keep API-reported size distinct from active mode pixels and physical panel resolution.
+        metadata["cgDisplayReportedSize"] = [CGDisplayPixelsWide(displayID), CGDisplayPixelsHigh(displayID)]
+        if let mode = CGDisplayCopyDisplayMode(displayID) {
+            metadata["displayModeSize"] = [mode.width, mode.height]
+            metadata["displayModePixelSize"] = [mode.pixelWidth, mode.pixelHeight]
+        }
         metadata["sourceRectPoints"] = [rectangle.origin.x, rectangle.origin.y, rectangle.width, rectangle.height]
         metadata["outputPixels"] = [1280, 720]
         metadata["cameraOutputPixels"] = [cameraDimensions.width, cameraDimensions.height]
