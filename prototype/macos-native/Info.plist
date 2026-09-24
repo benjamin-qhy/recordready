@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>RecordReadyProbe</string>
+<key>CFBundleIdentifier</key><string>dev.recordready.native-probe</string>
+<key>CFBundleName</key><string>RecordReady Native Probe</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSMinimumSystemVersion</key><string>13.0</string>
+<key>NSCameraUsageDescription</key><string>口播录制实验：预览相机并保存独立 camera.mp4，仅保存在本机。</string>
+<key>NSMicrophoneUsageDescription</key><string>口播录制实验：单次采集麦克风，将同源声音写入两份本地视频。</string>
+<key>NSHighResolutionCapable</key><true/>
+</dict></plist>
