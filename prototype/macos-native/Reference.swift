@@ -37,7 +37,10 @@ final class ReferenceApp: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         let screen = NSScreen.screens.first!, w = min(960.0, screen.frame.width-100), h = w*9/16
         window=NSWindow(contentRect:NSRect(x:screen.frame.minX+(screen.frame.width-w)/2,y:screen.frame.minY+(screen.frame.height-h)/2,width:w,height:h),styleMask:.borderless,backing:.buffered,defer:false)
-        window.title="RecordReady Capture Reference";window.contentView=Chart(frame:NSRect(x:0,y:0,width:w,height:h));window.makeKeyAndOrderFront(nil)
+        window.title="RecordReady Capture Reference"
+        // Stay above ordinary apps but below the recorder's floating controls.
+        window.level=NSWindow.Level(rawValue:NSWindow.Level.floating.rawValue-1)
+        window.contentView=Chart(frame:NSRect(x:0,y:0,width:w,height:h));window.makeKeyAndOrderFront(nil)
         let menu=NSMenu();let item=NSMenuItem();menu.addItem(item);let sub=NSMenu();item.submenu=sub
         sub.addItem(withTitle:"Quit reference",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q");NSApp.mainMenu=menu
         NSApp.activate(ignoringOtherApps:true)
