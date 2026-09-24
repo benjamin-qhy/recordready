@@ -89,6 +89,7 @@
 |---|---|---|
 | 桌面容器 | Tauri 2 | 跨平台窗口、打包、系统权限、前后端通信 |
 | 界面 | React + TypeScript + Vite | 单一录制界面及就近配置浮层 |
+| UI 组件与样式 | shadcn/ui（Radix）+ Tailwind CSS，Lucide React 图标 | 统一组件、橙色语义主题与可访问交互；规范见 [design.md](../design.md) |
 | 本地服务 | Rust | 会话、设备、轨道生命周期、保存和错误状态 |
 | macOS 屏幕采集 | ScreenCaptureKit | 捕获屏幕/窗口，排除应用自身浮窗 |
 | Windows 屏幕采集 | Windows.Graphics.Capture | 获取系统显示器/窗口帧 |
@@ -277,3 +278,7 @@ AI 眼神校正、字幕、剪辑、云同步、系统声音、虚拟摄像头�
 - [Apple ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-in-macos)
 - [Windows 屏幕采集](https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/screen-capture)
 - [Tauri Dialog](https://v2.tauri.app/plugin/dialog/)、[Opener](https://v2.tauri.app/plugin/opener/)、[Store](https://v2.tauri.app/plugin/store/)
+
+## 设计确认前置条件
+
+用户要求先完成橙色主题系统 UI 设计稿并选定方向，前端采用 shadcn/ui。AI 设计规范见 [design.md](../design.md)。设计稿选定和规范确认之后，仍需另行取得正式开发批准；此前开发确认请求暂不执行。
