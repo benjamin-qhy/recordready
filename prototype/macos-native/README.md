@@ -70,3 +70,8 @@ open 'prototype/macos-native/.build/RecordReady Capture Reference.app'
 控制窗左下角可选「720 横屏」「1080 横屏」「1080 竖屏」，各录 30 秒；输出尺寸同步用于 SCStream 和屏幕编码器。准备时按输出比例重算居中的源区域，录制时锁定选择。相机仍保持实际输入画幅。独立 Reference 程序读取本地 probe-state.json 的区域尺寸以匹配参考图，区域变化后应先确认参考图就位再开始。
 
 当前版本编译通过，仍有两处既有 Swift Sendable 捕获警告。新签名要求重新授权；在实际样片完成前，不声称两个 1080 档已通过。此功能仅存在于临时实验分支，不是正式开发。
+
+
+### 无录制的鼠标交互实验
+
+`bash prototype/macos-native/build-interaction.sh` 构建独立实验应用。正文穿透开关、底层点击计数、把手拖动与设置按钮响应均显示/记录状态。无需录屏、相机或麦克风权限，不修改录制实验。观测记录在 `artifacts/interaction-probe.json`，每次启动覆盖；当前证据及未完成项见 FINDINGS.md。
