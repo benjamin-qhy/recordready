@@ -15,8 +15,23 @@ final class HitSurface: NSView {
     override func mouseDown(with event: NSEvent) { onHit?(event) }
 }
 final class DragSurface: NSView {
-    var moved: (() -> Void)?
-    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event); moved?() }
+    var observed: ((String, NSEvent) -> Void)?
+    var anchor: NSPoint?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) {
+        anchor = event.locationInWindow
+        observed?("handleMouseDown", event)
+    }
+    override func mouseDragged(with event: NSEvent) {
+        guard let window = window, let anchor = anchor else { return }
+        let pointer = window.convertPoint(toScreen: event.locationInWindow)
+        window.setFrameOrigin(NSPoint(x: pointer.x-anchor.x, y: pointer.y-anchor.y))
+        observed?("handleMouseDragged", event)
+    }
+    override func mouseUp(with event: NSEvent) {
+        anchor = nil
+        observed?("handleMouseUp", event)
+    }
 }
 final class Probe: NSObject, NSApplicationDelegate {
     var host: NSWindow!, body: NSWindow!, handle: NSWindow!
@@ -46,7 +61,7 @@ final class Probe: NSObject, NSApplicationDelegate {
         handle = KeyWindow(contentRect: NSRect(x: 370,y: 610,width: 600,height: 44),styleMask: .borderless,backing: .buffered,defer: false)
         handle.title = "提词拖动把手"; handle.level = .floating; handle.backgroundColor = .systemPink
         let drag = DragSurface(frame: NSRect(x: 0,y: 0,width: 600,height: 44))
-        drag.moved = { [weak self] in self?.record("handleDragFinished") }
+        drag.observed = { [weak self] name, event in self?.record(name, event) }
         handle.contentView = drag
         let caption = NSTextField(labelWithString: "拖动这里 · 正文应跟随")
         caption.frame = NSRect(x: 16,y: 10,width: 350,height: 25); drag.addSubview(caption)
