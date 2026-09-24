@@ -75,3 +75,6 @@ open 'prototype/macos-native/.build/RecordReady Capture Reference.app'
 ### 无录制的鼠标交互实验
 
 `bash prototype/macos-native/build-interaction.sh` 构建独立实验应用。正文穿透开关、底层点击计数、把手拖动与设置按钮响应均显示/记录状态。无需录屏、相机或麦克风权限，不修改录制实验。观测记录在 `artifacts/interaction-probe.json`，每次启动覆盖；当前证据及未完成项见 FINDINGS.md。
+
+
+跨进程对照接收器：`bash prototype/macos-native/build-interaction-target.sh`，打开生成的应用，在正文覆盖坐标点击并与穿透关闭的负向对照比较。记录位于 `artifacts/interaction-target.json`；仅计数增加不代表穿透通过，必须负向对照能拦截。当前 CUA 运行的对照未满足这个条件，详见 FINDINGS.md。

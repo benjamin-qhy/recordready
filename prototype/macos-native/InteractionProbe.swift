@@ -64,8 +64,9 @@ final class Probe: NSObject, NSApplicationDelegate {
         drag.observed = { [weak self] name, event in self?.record(name, event) }
         handle.contentView = drag
         let caption = NSTextField(labelWithString: "拖动这里 · 正文应跟随")
-        caption.frame = NSRect(x: 16,y: 10,width: 350,height: 25); drag.addSubview(caption)
+        caption.frame = NSRect(x: 16,y: 10,width: 280,height: 25); drag.addSubview(caption)
         let settings = NSButton(title: "设置响应",target: self,action: #selector(setting)); settings.frame = NSRect(x: 460,y: 5,width: 125,height: 34); drag.addSubview(settings)
+        let bodyToggle = NSButton(title: "切换穿透", target: self, action: #selector(flip)); bodyToggle.frame = NSRect(x: 325,y: 5,width: 125,height: 34); drag.addSubview(bodyToggle)
         handle.addChildWindow(body, ordered: .below)
         host.makeKeyAndOrderFront(nil); body.orderFrontRegardless(); handle.orderFrontRegardless()
         let menu = NSMenu(); let item = NSMenuItem(); menu.addItem(item); let sub = NSMenu(); item.submenu = sub
