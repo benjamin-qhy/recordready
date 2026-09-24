@@ -132,7 +132,7 @@ final class Engine: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDa
         configured = true
     }
 
-    func start(displayID: CGDirectDisplayID, rectangle: CGRect) async throws {
+    func start(displayID: CGDirectDisplayID, rectangle: CGRect, outputWidth: Int, outputHeight: Int) async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
             throw ProbeError.message("找不到主显示器")
@@ -142,7 +142,7 @@ final class Engine: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDa
         }
         let filter = SCContentFilter(display: display, excludingApplications: [currentApp], exceptingWindows: [])
         let config = SCStreamConfiguration()
-        config.width = 1280; config.height = 720
+        config.width = outputWidth; config.height = outputHeight
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         config.queueDepth = 5
         config.sourceRect = rectangle
@@ -158,7 +158,7 @@ final class Engine: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDa
             throw ProbeError.message("无法读取相机实际画幅")
         }
         let cameraDimensions = CMVideoFormatDescriptionGetDimensions(cameraInput.device.activeFormat.formatDescription)
-        screenFile = try VideoFile(directory: folder, name: "screen", width: 1280, height: 720)
+        screenFile = try VideoFile(directory: folder, name: "screen", width: outputWidth, height: outputHeight)
         cameraFile = try VideoFile(directory: folder, name: "camera", width: Int(cameraDimensions.width), height: Int(cameraDimensions.height))
         FileManager.default.createFile(atPath: folder.appendingPathComponent("samples.jsonl").path, contents: nil)
         logHandle = try FileHandle(forWritingTo: folder.appendingPathComponent("samples.jsonl"))
@@ -173,7 +173,7 @@ final class Engine: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDa
             metadata["displayModePixelSize"] = [mode.pixelWidth, mode.pixelHeight]
         }
         metadata["sourceRectPoints"] = [rectangle.origin.x, rectangle.origin.y, rectangle.width, rectangle.height]
-        metadata["outputPixels"] = [1280, 720]
+        metadata["outputPixels"] = [outputWidth, outputHeight]
         metadata["cameraOutputPixels"] = [cameraDimensions.width, cameraDimensions.height]
         metadata["excludedApplicationPID"] = getpid()
         metadata["framework"] = "AppKit + ScreenCaptureKit + AVFoundation (not Tauri)"
@@ -299,6 +299,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let stopButton = NSButton(title: "停止并保存", target: nil, action: nil)
     let durationMenu = NSPopUpButton()
     var duration = 30.0, startedAt: Date?, timer: Timer?
+    var outputWidth = 1280, outputHeight = 720
     var busy = false
     var isRecording = false
     var rect = CGRect.zero
@@ -336,13 +337,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         controls = NSWindow(contentRect: NSRect(x: 80, y: 70, width: 700, height: 230), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         controls.title = "RecordReady · 临时 macOS 原生实验（非正式应用）"
         controls.delegate = self; controls.level = .floating
-        let heading = NSTextField(labelWithString: "屏幕 1280×720 · 相机原画幅 · H.264/AAC · 双文件")
+        let heading = NSTextField(labelWithString: "30 秒尺寸实验 · 相机原画幅 · H.264/AAC · 双文件")
         heading.font = .systemFont(ofSize: 17, weight: .semibold); heading.frame = NSRect(x: 20, y: 187, width: 660, height: 25)
         controls.contentView?.addSubview(heading)
         status.frame = NSRect(x: 20, y: 75, width: 660, height: 95)
         status.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         controls.contentView?.addSubview(status)
-        durationMenu.addItems(withTitles: ["30 秒", "30 分钟"]); durationMenu.frame = NSRect(x: 20, y: 25, width: 105, height: 30)
+        durationMenu.addItems(withTitles: ["720 横屏", "1080 横屏", "1080 竖屏"]); durationMenu.target = self; durationMenu.action = #selector(changeOutput); durationMenu.frame = NSRect(x: 20, y: 25, width: 105, height: 30)
         controls.contentView?.addSubview(durationMenu)
         for (button, title, selector, left) in [(permissionButton, "授权并预览", #selector(authorize), 140.0),
                                                   (startButton, "开始实验", #selector(start), 275.0),
@@ -364,11 +365,26 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.mainMenu = menu
         writeState("idle")
     }
+    @objc func changeOutput() {
+        guard !busy, !isRecording, let screen = NSScreen.screens.first else { return }
+        let sizes = [(1280,720),(1920,1080),(1080,1920)]
+        (outputWidth, outputHeight) = sizes[durationMenu.indexOfSelectedItem]
+        let ratio = Double(outputWidth) / Double(outputHeight)
+        let h = min(screen.frame.height - 200, 960 / ratio)
+        let w = h * ratio
+        let x = (screen.frame.width-w)/2, y = (screen.frame.height-h)/2
+        rect = CGRect(x:x,y:y,width:w,height:h)
+        frameWindow.setFrame(NSRect(x:screen.frame.minX+x,y:screen.frame.maxY-y-h,width:w,height:h),display:true)
+        status.stringValue = "待验证输出：\(outputWidth)×\(outputHeight)，30 秒；参考图将自动匹配区域。"
+        writeState("format-selected")
+    }
     func writeState(_ state: String) {
         try? FileManager.default.createDirectory(at: artifacts, withIntermediateDirectories: true)
         jsonWrite(["state":state,"status":status.stringValue,"screenPermission":CGPreflightScreenCaptureAccess(),
                    "cameraPermission":AVCaptureDevice.authorizationStatus(for:.video).rawValue,
                    "microphonePermission":AVCaptureDevice.authorizationStatus(for:.audio).rawValue,
+                   "sourceRectPoints":[rect.minX,rect.minY,rect.width,rect.height],
+                   "outputPixels":[outputWidth,outputHeight],
                    "sessionDirectory":engine.directory?.path ?? ""], artifacts.appendingPathComponent("probe-state.json"))
     }
     @objc func authorize() {
@@ -396,11 +412,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func start() {
         guard !busy, !isRecording else { return }
         busy = true; startButton.isEnabled = false; durationMenu.isEnabled = false
-        duration = durationMenu.indexOfSelectedItem == 1 ? 1800 : 30
+        duration = 30
         status.stringValue = "准备录制…"; writeState("preparing")
         Task { @MainActor in
             do {
-                try await engine.start(displayID: displayID, rectangle: rect)
+                try await engine.start(displayID: displayID, rectangle: rect, outputWidth: outputWidth, outputHeight: outputHeight)
                 busy = false; isRecording = true; stopButton.isEnabled = true; startedAt = Date(); resourceSamples = []; motionSamples = []
                 originalPromptFrame = promptWindow.frame; originalCameraFrame = cameraWindow.frame
                 timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }

@@ -33,6 +33,7 @@ final class Chart: NSView {
 }
 final class ReferenceApp: NSObject, NSApplicationDelegate {
     var window: NSWindow!
+    var layoutTimer: Timer?
     func applicationDidFinishLaunching(_ notification:Notification) {
         NSApp.setActivationPolicy(.regular)
         let screen = NSScreen.screens.first!, w = min(960.0, screen.frame.width-100), h = w*9/16
@@ -44,6 +45,14 @@ final class ReferenceApp: NSObject, NSApplicationDelegate {
         let menu=NSMenu();let item=NSMenuItem();menu.addItem(item);let sub=NSMenu();item.submenu=sub
         sub.addItem(withTitle:"Quit reference",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q");NSApp.mainMenu=menu
         NSApp.activate(ignoringOtherApps:true)
+        layoutTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self = self,
+                  let data = try? Data(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("artifacts/probe-state.json")),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String:Any],
+                  let rect = object["sourceRectPoints"] as? [Double], rect.count == 4 else { return }
+            let frame = NSRect(x:screen.frame.minX+rect[0],y:screen.frame.maxY-rect[1]-rect[3],width:rect[2],height:rect[3])
+            if self.window.frame != frame { self.window.setFrame(frame,display:true) }
+        }
     }
 }
 let app=ReferenceApp();NSApplication.shared.delegate=app;NSApplication.shared.run()
