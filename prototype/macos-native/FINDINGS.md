@@ -88,3 +88,11 @@ Apple M4 Pro / arm64，macOS 26.4；Swift 6.1.2、Command Line Tools SDK 15.5；
 验证：诊断程序编译运行成功；`Main.swift` 在 Swift 5 模式 typecheck 通过，有两处现有 Sendable 捕获警告（App 的 setupQueue/Timer 闭包），未将其宣称为无警告构建。本轮未重签或重启原录制应用，保留现有授权状态。
 
 官方语义：[NSScreen.backingScaleFactor](https://developer.apple.com/documentation/appkit/nsscreen/backingscalefactor)、[CGDisplayMode](https://developer.apple.com/documentation/coregraphics/cgdisplaymode)。
+
+## 既有样片的网格像素对照
+
+对 `PROTOTYPE-2026-09-24T04-26-32Z-ED4B27` 的第 2、15、28 秒屏幕帧运行 `measure-grid.py`。Reference.swift 绘制的网格间距为 60 逻辑点，源区域 960×540 点，输出 1280×720 像素，预期每格为 80×80 像素。
+
+三张图均测得 15 条内部竖网格线、6 条采样范围内横网格线；横纵网格间距中位数均为 80.0 像素。检测使用像素 RGB 均值及跨行/列中位数抑制文字和动态标记，避开边框和底部色条。第 2 秒帧另经人工视觉检查，四角标记和边框完整。可复现命令：`python3 prototype/macos-native/measure-grid.py <本地样片目录>`，依赖 numpy、Pillow。
+
+这补充了已测单屏、固定区域、1280×720 输出配置的实际等比例映射证据；不证明其他输出预设、任意区域、显示模式切换、外接混合 DPI 或物理屏幕同步。历史原始样片不变，分析不启动录制。正式开发仍须用户明确确认。
