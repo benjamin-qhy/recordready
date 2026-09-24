@@ -304,6 +304,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var rect = CGRect.zero
     var displayID: CGDirectDisplayID = 0
     var resourceSamples: [[String: Any]] = []
+    var motionSamples: [[String: Any]] = []
+    var originalPromptFrame = NSRect.zero, originalCameraFrame = NSRect.zero
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -399,7 +401,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Task { @MainActor in
             do {
                 try await engine.start(displayID: displayID, rectangle: rect)
-                busy = false; isRecording = true; stopButton.isEnabled = true; startedAt = Date(); resourceSamples = []
+                busy = false; isRecording = true; stopButton.isEnabled = true; startedAt = Date(); resourceSamples = []; motionSamples = []
+                originalPromptFrame = promptWindow.frame; originalCameraFrame = cameraWindow.frame
                 timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
                 tick()
             } catch {
@@ -412,12 +415,22 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func tick() {
         guard let startedAt else { return }
         let elapsed = Date().timeIntervalSince(startedAt)
+        // Temporary experiment only: move both excluded windows across the source.
+        if elapsed >= 5 && elapsed < 25 {
+            let phase = min(1.0, (elapsed - 5) / 19)
+            let bounds = frameWindow.frame
+            promptWindow.setFrameOrigin(NSPoint(x: bounds.minX + phase * (bounds.width - promptWindow.frame.width), y: bounds.midY + 40))
+            cameraWindow.setFrameOrigin(NSPoint(x: bounds.minX + (1-phase) * (bounds.width - cameraWindow.frame.width), y: bounds.midY - cameraWindow.frame.height))
+        }
+        func coordinates(_ window: NSWindow) -> [CGFloat] { let f = window.frame; return [f.minX, f.minY, f.width, f.height] }
+        motionSamples.append(["elapsed": elapsed, "hostClock": CMClockGetTime(CMClockGetHostTimeClock()).seconds,
+                              "promptFrame": coordinates(promptWindow), "cameraFrame": coordinates(cameraWindow), "captureFrame": coordinates(frameWindow)])
         var info = mach_task_basic_info(); var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
         let result = withUnsafeMutablePointer(to: &info) { p in p.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) } }
         let rss = result == KERN_SUCCESS ? Double(info.resident_size) / 1048576 : -1
         resourceSamples.append(["elapsed": elapsed, "residentMB": rss])
         let stats = engine.queue.sync { "screen \(engine.screenFile?.videoFrames ?? 0) 帧 · camera \(engine.cameraFile?.videoFrames ?? 0) 帧 · mic \(engine.screenFile?.audioBuffers ?? 0) 包" }
-        status.stringValue = "录制中 \(Int(elapsed)) / \(Int(duration)) 秒 · RSS \(Int(rss)) MB\n\(stats)\n拖动浮窗并操作下方应用；首尾拍手。停止后等待文件封装。"
+        status.stringValue = "录制中 \(Int(elapsed)) / \(Int(duration)) 秒 · RSS \(Int(rss)) MB\n\(stats)\n第 5–25 秒自动移动提词及相机窗；无需手动操作。"
         writeState("recording")
         if elapsed >= duration { stop() }
     }
@@ -427,7 +440,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         stopButton.isEnabled = false; status.stringValue = "正在停止采集并封装两份文件…"; writeState("saving")
         Task { @MainActor in
             let result = await engine.stop()
-            if let folder = engine.directory { jsonWrite(resourceSamples, folder.appendingPathComponent("memory.json")) }
+            if let folder = engine.directory {
+                jsonWrite(resourceSamples, folder.appendingPathComponent("memory.json"))
+                jsonWrite(motionSamples, folder.appendingPathComponent("window-motion.json"))
+            }
+            promptWindow.setFrame(originalPromptFrame, display: true)
+            cameraWindow.setFrame(originalCameraFrame, display: true)
             status.stringValue = result; busy = false; startButton.isEnabled = true; durationMenu.isEnabled = true; writeState("finished")
         }
     }
