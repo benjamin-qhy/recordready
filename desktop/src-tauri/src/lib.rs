@@ -72,13 +72,14 @@ async fn show_settings(app: tauri::AppHandle, section: String, anchor: Option<Ve
         anchor[0]>=p.x && anchor[0]<p.x+z.width && anchor[1]>=p.y && anchor[1]<p.y+z.height
     });
     let bounds = monitor.map(|m| { let p=m.position().to_logical::<f64>(m.scale_factor()); let z=m.size().to_logical::<f64>(m.scale_factor()); [p.x+16.0,p.y+40.0,z.width-32.0,z.height-120.0] }).unwrap_or([0.0,40.0,1200.0,720.0]);
-    let (w,h): (f64,f64) = match section.as_str() { "size"=>(400.0,740.0),"script"=>(480.0,560.0),"camera"=>(360.0,510.0),"audio"=>(360.0,410.0),"appearance"=>(360.0,320.0),_=>(460.0,520.0) };
+    let (w,h): (f64,f64) = match section.as_str() { "size"=>(400.0,860.0),"script"=>(480.0,614.0),"camera"=>(360.0,494.0),"audio"=>(360.0,394.0),"appearance"=>(360.0,374.0),_=>(460.0,520.0) };
     let (w,h)=(w.min(bounds[2]),h.min(bounds[3]));
     let x=(anchor[0]+anchor[2]/2.0-w/2.0).clamp(bounds[0],bounds[0]+bounds[2]-w);
     let y=if anchor[1]-h-12.0>=bounds[1] {anchor[1]-h-12.0} else {(anchor[1]+anchor[3]+12.0).min(bounds[1]+bounds[3]-h).max(bounds[1])};
     window.set_size(tauri::LogicalSize::new(w,h)).map_err(|e|e.to_string())?;
     window.set_position(tauri::LogicalPosition::new(x,y)).map_err(|e|e.to_string())?;
     window.emit("section", section).map_err(|e| e.to_string())?;
+    window.emit("settings-anchor", serde_json::json!({"side":if y<anchor[1] {"bottom"} else {"top"},"x":(anchor[0]+anchor[2]/2.0-x).clamp(24.0,w-24.0)})).map_err(|e|e.to_string())?;
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())
 }
@@ -99,6 +100,7 @@ async fn sync_overlays(app: tauri::AppHandle) -> Result<(),String> {
                     let b=rect(&state[if label=="prompter" {"promptVisibleFrame"} else {"visibleFrame"}]).unwrap_or(vec![0.0,0.0,1440.0,900.0]);
                     let x=r[0].clamp(b[0]+16.0,(b[0]+b[2]-r[2]-16.0).max(b[0]+16.0));
                     let y=r[1].clamp(b[1]+16.0,(b[1]+b[3]-r[3]-16.0).max(b[1]+16.0));
+                    window.set_size(tauri::LogicalSize::new(r[2],r[3])).map_err(|e|e.to_string())?;
                     window.set_position(tauri::LogicalPosition::new(x,y)).map_err(|e|e.to_string())?;
                     if !window.is_visible().unwrap_or(false) { window.show().map_err(|e|e.to_string())?; }
                 }
@@ -154,7 +156,7 @@ pub fn run() {
                     let scale = monitor.scale_factor();
                     let size = monitor.size().to_logical::<f64>(scale);
                     let origin = monitor.position().to_logical::<f64>(scale);
-                    toolbar.set_position(tauri::LogicalPosition::new(origin.x + (size.width - 980.0) / 2.0, origin.y + size.height - 150.0))?;
+                    toolbar.set_position(tauri::LogicalPosition::new(origin.x + (size.width - 1120.0) / 2.0, origin.y + size.height - 150.0))?;
                 }
             }
             Ok(())

@@ -227,7 +227,7 @@ final class PreviewDragView: DragHandle {
                 guard let self = self else { return }
                 let v = NSScreen.screens.first(where: { $0.visibleFrame.contains(point) })?.visibleFrame ?? self.screen.visibleFrame
                 let x = max(v.minX+16,min(point.x+36-320,v.maxX-656))
-                let y = max(v.minY+112,min(point.y-200,v.maxY-236))
+                let y = max(v.minY+(self.language == "en" ? 112 : 80),min(point.y-200,v.maxY-236))
                 self.promptHandle?.setFrameOrigin(CGPoint(x:x+284,y:y+200))
                 self.prompter?.setFrameOrigin(CGPoint(x:x,y:y))
             }
@@ -316,7 +316,8 @@ final class PreviewDragView: DragHandle {
         refreshDevices()
         let details = engine?.metadata ?? [:]
         let body = prompter?.frame ?? .zero
-        let promptBar = CGRect(x:body.minX,y:body.minY-96,width:body.width,height:96)
+        let toolbarHeight: CGFloat = language == "en" ? 96 : 64
+        let promptBar = CGRect(x:body.minX,y:body.minY-toolbarHeight,width:body.width,height:toolbarHeight)
         let sizeBar = CGRect(x:region.midX-160,y:region.maxY+28,width:320,height:48)
         return ["phase": phase, "error": error, "remaining": remaining,
                 "elapsed": startedAt.map { max(0, Date().timeIntervalSince($0)) } ?? 0,

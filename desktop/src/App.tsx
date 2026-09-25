@@ -1,10 +1,11 @@
+import { Arrow } from '@radix-ui/react-arrow'
 import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open } from '@tauri-apps/plugin-dialog'
-import { Video, Mic, MicOff, FolderOpen, Settings, FileText, Square, Circle, X, Play, Pause, RotateCcw, Scan, GripVertical, AlertCircle } from 'lucide-react'
+import { Video, Mic, MicOff, FolderOpen, Settings, FileText, Square, Circle, X, Play, Pause, RotateCcw, Scan, GripVertical, AlertCircle, Monitor, Smartphone, Check, Info, Type, Gauge, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,6 +39,17 @@ function Options({label,value,onChange,items,disabled=false}:{label:string;value
   return <RadioGroup aria-label={label} value={value} onValueChange={onChange} disabled={disabled} className="option-group">{items.map(([v,l])=><label key={v} htmlFor={`${id}-${v}`} className="option"><RadioGroupItem id={`${id}-${v}`} value={v}/><span>{l}</span></label>)}</RadioGroup>
 }
 
+function aspectRatio(width:number,height:number) {
+  const gcd=(a:number,b:number):number=>b?gcd(b,a%b):a
+  const divisor=gcd(width,height)
+  return `${width/divisor}:${height/divisor}`
+}
+
+function AudioLevel({value,label}:{value:number;label:string}) {
+  const level=Math.max(0,Math.min(1,value))
+  return <div className="audio-level" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={1} aria-valuenow={level}>{Array.from({length:12},(_,i)=><span key={i} className={level>(i/12)?'active':''} aria-hidden="true"/>)}</div>
+}
+
 export default function App() {
   const {t,i18n:translation} = useTranslation()
   const language=translation.language
@@ -50,6 +62,7 @@ export default function App() {
   const [title,setTitle] = useState(localStorage.getItem('rr.title') ?? '')
   const [width,setWidth] = useState('1080'), [height,setHeight] = useState('1920')
   const [sizeError,setSizeError] = useState(false)
+  const [anchor,setAnchor] = useState<{side:string;x:number}|null>(null)
   const lastPhase = useRef('idle')
   const sizeInitialized=useRef(false)
   const locked = isLocked(state.phase)
@@ -73,6 +86,7 @@ export default function App() {
     }
     void poll(); const timer=setInterval(()=>void poll(),300)
     const sectionListener=desktop?listen<string>('section',e=>{setTab(e.payload);setError('');requestAnimationFrame(()=>document.querySelector<HTMLElement>('main button')?.focus())}):Promise.resolve(()=>{})
+    const anchorListener=desktop?listen<{side:string;x:number}>('settings-anchor',e=>setAnchor(e.payload)):Promise.resolve(()=>{})
     const focusListener=desktop?listen('restore-focus',()=>returnFocus?.focus()):Promise.resolve(()=>{})
     const onStorage=()=>{const th=localStorage.getItem('rr.theme')??'system';setTheme(th);themeApply(th);setScript(localStorage.getItem('rr.script')??'');setTitle(localStorage.getItem('rr.title')??'');const language=localStorage.getItem('rr.language');if(language)void i18n.changeLanguage(language)}
     const onEscape=(event:KeyboardEvent)=>{
@@ -86,7 +100,7 @@ export default function App() {
     const media=matchMedia('(prefers-color-scheme: dark)')
     const onSystem=()=>themeApply(localStorage.getItem('rr.theme')??'system')
     window.addEventListener('storage',onStorage);media.addEventListener('change',onSystem)
-    return ()=>{disposed=true;clearInterval(timer);void sectionListener.then(f=>f());void focusListener.then(f=>f());window.removeEventListener('keydown',onEscape);window.removeEventListener('storage',onStorage);media.removeEventListener('change',onSystem)}
+    return ()=>{disposed=true;clearInterval(timer);void sectionListener.then(f=>f());void focusListener.then(f=>f());void anchorListener.then(f=>f());window.removeEventListener('keydown',onEscape);window.removeEventListener('storage',onStorage);media.removeEventListener('change',onSystem)}
   },[])
 
   async function run(action:string,args:Record<string,unknown>={}) {
@@ -118,63 +132,63 @@ export default function App() {
     :state.phase==='ready'?<Button size="lg" disabled={pending} onClick={()=>void run('start')}><Circle data-icon="inline-start"/>{t('start')}</Button>
     :<Button size="lg" disabled={!desktop||pending||locked} onClick={()=>void prepare()}>{t(locked?state.phase:'prepare')}</Button>
 
-  if(view==='region') return <main className="region-toolbar"><Button variant="ghost" disabled={locked} onClick={e=>void section('size',e.currentTarget)}><Scan data-icon="inline-start"/>{state.width} × {state.height}</Button><Button variant="ghost" disabled={locked} onClick={e=>void section('size',e.currentTarget)}>{t('size')}</Button></main>
+  if(view==='region') return <main className="region-toolbar"><Button variant="ghost" disabled={locked} onClick={e=>void section('size',e.currentTarget)}><Scan data-icon="inline-start"/>{aspectRatio(state.width,state.height)} {state.width!==state.height&&t(state.width<state.height?'portrait':'landscape').split(' · ')[0]}<ChevronDown aria-hidden="true"/></Button><Button variant="ghost" disabled={locked} onClick={e=>void section('size',e.currentTarget)}>{state.width} × {state.height}<ChevronDown aria-hidden="true"/></Button></main>
   if(view==='prompter') return <TooltipProvider><main className="prompt-toolbar dark">
     <Button variant="ghost" disabled={locked} onClick={e=>void section('script',e.currentTarget)}><FileText data-icon="inline-start"/>{t('script')}</Button>
-    <Field><FieldLabel>{t('font')}</FieldLabel><select aria-label={t('font')} value={state.fontSize??32} disabled={!desktop} onChange={e=>void run('prompt',{fontSize:Number(e.target.value)})}>{[24,28,32,36,40,48].map(n=><option key={n} value={n}>{n}px</option>)}</select></Field>
-    <Field><FieldLabel>{t('speed')}</FieldLabel><select aria-label={t('speed')} value={state.promptSpeed??24} disabled={!desktop} onChange={e=>void run('prompt',{speed:Number(e.target.value)})}>{[[12,'slow'],[24,'normal'],[40,'fast']].map(([v,k])=><option key={v} value={v}>{t(String(k))}</option>)}</select></Field>
+    <Field><FieldLabel><Type aria-hidden="true"/>{t('font')}</FieldLabel><select aria-label={t('font')} value={state.fontSize??32} disabled={!desktop} onChange={e=>void run('prompt',{fontSize:Number(e.target.value)})}>{[24,28,32,36,40,48].map(n=><option key={n} value={n}>{n}px</option>)}</select></Field>
+    <Field><FieldLabel><Gauge aria-hidden="true"/>{t('speed')}</FieldLabel><select aria-label={t('speed')} value={state.promptSpeed??24} disabled={!desktop} onChange={e=>void run('prompt',{speed:Number(e.target.value)})}>{[[12,'slow'],[24,'normal'],[40,'fast']].map(([v,k])=><option key={v} value={v}>{t(String(k))}</option>)}</select></Field>
     <Button variant="ghost" disabled={!desktop} onClick={()=>void run('prompt',{reset:true})}><RotateCcw data-icon="inline-start"/>{t('reset')}</Button>
     <Button disabled={!desktop} onClick={()=>void run('prompt',{playing:!state.playing})}>{state.playing?<Pause data-icon="inline-start"/>:<Play data-icon="inline-start"/>}{t(state.playing?'promptPause':state.promptStarted?'promptResume':'promptStart')}</Button>
     {errorPanel&&<p role="alert">{t(errorPanel,{defaultValue:errorPanel})}</p>}
   </main></TooltipProvider>
 
-  if(!settingsView) return <TooltipProvider><main>
+  if(!settingsView) return <TooltipProvider><main className="main-panel">
     <div className="toolbar">
       <Button variant="ghost" size="icon" aria-label={t('move')} onMouseDown={()=>{if(desktop)void getCurrentWindow().startDragging()}}><GripVertical/></Button>
       <div className="status" role="status"><span className={`dot ${state.phase==='recording'?'recording':''}`}/>{t(state.phase)}</div>
       <span className="clock">{clock(state.elapsed)}</span><Separator orientation="vertical" className="h-8"/>
       {icon('camera',Video)}{icon('audio',state.microphone?Mic:MicOff)}
-      <meter min={0} max={1} value={state.level??0} aria-label={t('microphone')} className="w-12"/>
+      <AudioLevel value={state.level??0} label={t('microphone')}/>
       {state.phase==='idle'&&<>{icon('size',Scan)}{icon('script',FileText)}</>}
       {icon('saveLocation',FolderOpen)}{icon('appearance',Settings)}
-      <div className="ml-auto">{recorderButton}</div>
+      <div className="record-action">{recorderButton}</div>
     </div>
     <div className="toolbar-meta"><span>{state.width} × {state.height}{!state.microphone?` · ${t('silent')}`:''}</span><span>{errorPanel?t(errorPanel,{defaultValue:errorPanel}):''}</span></div>
     {!desktop&&<Alert className="browser-note"><AlertCircle/><AlertDescription>{t('nativeRequired')}</AlertDescription></Alert>}
   </main></TooltipProvider>
 
-  return <TooltipProvider><main className="settings" role={tab==='quit'?'alertdialog':'dialog'} aria-labelledby="settings-title">
-    <header><h1 id="settings-title">{t(tab)}</h1><Button variant="ghost" size="icon" aria-label={t('close')} onClick={()=>void hide()}><X/></Button></header>
+  return <TooltipProvider><div className="settings-shell">{anchor&&['camera','audio','appearance'].includes(tab)&&<Arrow aria-hidden="true" width={24} height={12} className={`settings-arrow arrow-${anchor.side}`} style={{left:anchor.x-12}}/>}<main className={`settings settings-${tab}`} role={tab==='quit'?'alertdialog':'dialog'} aria-labelledby="settings-title">
+    <header><h1 id="settings-title">{tab==='script'&&<FileText aria-hidden="true"/>}{t(tab)}</h1><Button variant="ghost" size="icon" aria-label={t('close')} onClick={()=>void hide()}><X/></Button></header>
 
     {!desktop&&<Alert><AlertDescription>{t('nativeRequired')}</AlertDescription></Alert>}
     {errorPanel&&<Alert variant="destructive"><AlertCircle/><AlertTitle>{t('error')}</AlertTitle><AlertDescription>{t(errorPanel,{defaultValue:errorPanel})}</AlertDescription></Alert>}
     {locked&&!['appearance','quit','results','script'].includes(tab)&&<p className="helper">{t('locked')}</p>}
     {tab==='camera'&&<FieldGroup>
       <Field orientation="horizontal"><FieldLabel htmlFor="camera">{t('cameraEnabled')}</FieldLabel><Switch id="camera" checked={state.camera} disabled={configurationDisabled} onCheckedChange={camera=>void run('configure',{camera})}/></Field>
-      <Separator/><Field><FieldLabel>{t('device')}</FieldLabel><Choice label={t('device')} value={state.cameraID||'default'} disabled={configurationDisabled||!state.camera} onChange={v=>void run('configure',{cameraID:v==='default'?'':v})} items={deviceItems('cameras',state.cameraID??'')}/></Field>
-      <Separator/><Field><FieldLabel>{t('previewLayout')}</FieldLabel><Options label={t('previewLayout')} value={state.previewLayout??'small'} disabled={!desktop||!state.camera||pending} onChange={layout=>void run('preview',{layout})} items={[["small",t('small')],["fill",t('fill')]]}/></Field>
-      <Field><FieldLabel>{t('previewPosition')}</FieldLabel><Options label={t('previewPosition')} value={state.previewPosition??'bottom-right'} disabled={!desktop||!state.camera||state.previewLayout==='fill'||pending} onChange={position=>void run('preview',{position})} items={[["top-left",t('topLeft')],["top-right",t('topRight')],["bottom-left",t('bottomLeft')],["bottom-right",t('bottomRight')]]}/><FieldDescription>{state.previewPosition==='manual'?`${t('manual')} · `:''}{t('dragPreview')}</FieldDescription></Field>
+      <Separator/><Field className="camera-row"><FieldLabel>{t('device')}</FieldLabel><Choice label={t('device')} value={state.cameraID||'default'} disabled={configurationDisabled||!state.camera} onChange={v=>void run('configure',{cameraID:v==='default'?'':v})} items={deviceItems('cameras',state.cameraID??'')}/></Field>
+      <Separator/><Field className="camera-row"><FieldLabel>{t('previewLayout')}</FieldLabel><Options label={t('previewLayout')} value={state.previewLayout??'small'} disabled={!desktop||!state.camera||pending} onChange={layout=>void run('preview',{layout})} items={[["small",t('small')],["fill",t('fill')]]}/></Field>
+      <Field className="camera-row position-row"><FieldLabel>{t('previewPosition')}</FieldLabel><Options label={t('previewPosition')} value={state.previewPosition??'bottom-right'} disabled={!desktop||!state.camera||state.previewLayout==='fill'||pending} onChange={position=>void run('preview',{position})} items={[["top-left",t('topLeft')],["top-right",t('topRight')],["bottom-left",t('bottomLeft')],["bottom-right",t('bottomRight')]]}/><FieldDescription>{state.previewPosition==='manual'?`${t('manual')} · `:''}{t('dragPreview')}</FieldDescription></Field>
       <Separator/><Field orientation="horizontal"><FieldLabel htmlFor="mirror">{t('mirror')}</FieldLabel><Switch id="mirror" checked={state.mirror??false} disabled={!desktop||!state.camera||pending} onCheckedChange={mirror=>void run('preview',{mirror})}/></Field><p className="helper">{t('previewOnly')}</p>
     </FieldGroup>}
     {tab==='audio'&&<FieldGroup>
-      <Field><FieldLabel>{t('recordingMode')}</FieldLabel><Options label={t('recordingMode')} value={state.microphone?'microphone':'silent'} disabled={configurationDisabled} onChange={v=>void run('configure',{microphone:v==='microphone'})} items={[["microphone",t('microphone')],["silent",t('silent')]]}/><FieldDescription>{t(!state.microphone?'silentHelp':state.camera?'audioHelp':'audioScreenHelp')}</FieldDescription></Field>
+      <Field><FieldLabel>{t('recordingMode')}</FieldLabel><Options label={t('recordingMode')} value={state.microphone?'microphone':'silent'} disabled={configurationDisabled} onChange={v=>void run('configure',{microphone:v==='microphone'})} items={[["microphone",t('microphone')],["silent",t('silent')]]}/><FieldDescription className="info-line"><Info aria-hidden="true"/>{t(!state.microphone?'silentHelp':state.camera?'audioHelp':'audioScreenHelp')}</FieldDescription></Field>
       <Separator/><Field><FieldLabel>{t('device')}</FieldLabel><Choice label={t('device')} value={state.microphoneID||'default'} disabled={configurationDisabled||!state.microphone} onChange={v=>void run('configure',{microphoneID:v==='default'?'':v})} items={deviceItems('microphones',state.microphoneID??'')}/></Field>
-      <Field><FieldLabel>{t('inputLevel')}</FieldLabel><meter min={0} max={1} value={state.microphone?(state.level??0):0} aria-label={t('inputLevel')} className="w-full"/></Field>
+      <Field className="level-row"><FieldLabel>{t('inputLevel')}</FieldLabel><AudioLevel value={state.microphone?(state.level??0):0} label={t('inputLevel')}/></Field>
     </FieldGroup>}
     {tab==='size'&&<FieldGroup>
       <Field><FieldLabel>{t('display')}</FieldLabel><Choice label={t('display')} value={state.displayID??''} disabled={configurationDisabled} onChange={displayID=>void run('configure',{displayID})} items={deviceItems('displays',state.displayID??'')}/></Field>
       <p className="helper">{t('sizeApplied')} · {state.width} × {state.height}</p>
-      {[['portrait',0,4],['landscape',4,8],['other',8,12]].map(([name,start,end])=><Field key={name}><FieldLabel>{t(String(name))}</FieldLabel><div className="presets">{presets.slice(Number(start),Number(end)).map(([w,h])=><Button key={`${w}x${h}`} variant={state.width===w&&state.height===h?'default':'outline'} disabled={locked||pending||!desktop} onClick={()=>{setWidth(String(w));setHeight(String(h));setSizeError(false);void run('configure',{width:w,height:h})}}>{w} × {h}</Button>)}</div></Field>)}
+      {[['portrait',0,4],['landscape',4,8],['other',8,12]].map(([name,start,end])=><Field key={name}><FieldLabel>{t(String(name))}</FieldLabel><div className="presets">{presets.slice(Number(start),Number(end)).map(([w,h])=><Button key={`${w}x${h}`} variant="outline" aria-pressed={state.width===w&&state.height===h} data-selected={state.width===w&&state.height===h} disabled={locked||pending||!desktop} onClick={()=>{setWidth(String(w));setHeight(String(h));setSizeError(false);void run('configure',{width:w,height:h})}}>{w<h?<Smartphone aria-hidden="true"/>:w>h?<Monitor aria-hidden="true"/>:<Square aria-hidden="true"/>}{name==='other'&&<span>{w===h?'1:1':w/h===.75?'3:4':w/h===.8?'4:5':'4:3'}</span>}<span>{w} × {h}</span>{state.width===w&&state.height===h&&<Check className="preset-check" aria-hidden="true"/>}</Button>)}</div></Field>)}
       <Separator/><Field data-invalid={sizeError}><FieldLabel>{t('custom')}</FieldLabel><div className="grid grid-cols-2 gap-3"><Field><FieldLabel htmlFor="width">{t('width')}</FieldLabel><Input id="width" type="number" value={width} min={240} max={3840} step={2} aria-invalid={sizeError} disabled={locked} onChange={e=>setWidth(e.target.value)}/></Field><Field><FieldLabel htmlFor="height">{t('height')}</FieldLabel><Input id="height" type="number" value={height} min={240} max={3840} step={2} aria-invalid={sizeError} disabled={locked} onChange={e=>setHeight(e.target.value)}/></Field></div>{sizeError&&<FieldDescription role="alert">{t('invalid_size')}</FieldDescription>}<Button disabled={locked||pending||!desktop} onClick={()=>{const w=Number(width),h=Number(height);setSizeError(!validSize(w,h));if(validSize(w,h))void run('configure',{width:w,height:h})}}>{t('apply')}</Button></Field><p className="helper">{t('capability')}</p>
     </FieldGroup>}
     {tab==='script'&&<FieldGroup>
       <Field><FieldLabel htmlFor="title">{t('scriptTitle')}</FieldLabel><Input id="title" value={title} disabled={locked} onChange={e=>{setTitle(e.target.value);localStorage.setItem('rr.title',e.target.value)}}/></Field>
-      <Field><FieldLabel htmlFor="script">{t('body')}</FieldLabel><Textarea id="script" className="min-h-56" value={script} disabled={locked} onChange={e=>{setScript(e.target.value);localStorage.setItem('rr.script',e.target.value)}}/><FieldDescription>{t('chars',{count:[...script.replace(/\r?\n/g,'')].length})}</FieldDescription></Field>
+      <Field className="script-body"><FieldLabel htmlFor="script">{t('body')}</FieldLabel><Textarea id="script" className="min-h-56" value={script} disabled={locked} onChange={e=>{setScript(e.target.value);localStorage.setItem('rr.script',e.target.value)}}/><FieldDescription>{t('chars',{count:[...script.replace(/\r?\n/g,'')].length})}</FieldDescription></Field>
       <Button disabled={locked||pending} onClick={async()=>{if(!desktop||await run('script',{text:script}))await hide()}}>{t('done')}</Button>
     </FieldGroup>}
     {tab==='appearance'&&<FieldGroup>
-      <Field><FieldLabel>{t('theme')}</FieldLabel><Options label={t('theme')} value={theme} onChange={v=>{setTheme(v);localStorage.setItem('rr.theme',v);themeApply(v)}} items={['system','light','dark'].map(v=>[v,t(v)])}/></Field>
-      <Separator/><Field><FieldLabel>{t('language')}</FieldLabel><Choice label={t('language')} value={i18n.language} onChange={v=>{localStorage.setItem('rr.language',v);void i18n.changeLanguage(v)}} items={[["zh-CN","简体中文"],["en","English"]]}/></Field><p className="helper">{t('autoSaved')}</p>
+      <Field><FieldLabel>{t('theme')}</FieldLabel><Options label={t('theme')} value={theme} onChange={v=>{setTheme(v);localStorage.setItem('rr.theme',v);themeApply(v)}} items={['system','light','dark'].map(v=>[v,t(v)])}/>{theme==='system'&&<FieldDescription>{t('currentSystem',{mode:t(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})}</FieldDescription>}</Field>
+      <Separator/><Field><FieldLabel>{t('language')}</FieldLabel><Choice label={t('language')} value={i18n.language} onChange={v=>{localStorage.setItem('rr.language',v);void i18n.changeLanguage(v)}} items={[["zh-CN","简体中文"],["en","English"]]}/></Field><p className="helper info-line"><Info aria-hidden="true"/>{t('autoSaved')}</p>
     </FieldGroup>}
     {tab==='results'&&<FieldGroup>
       {state.result.fatalError&&<Alert variant="destructive"><AlertTitle>{t('interrupted')}</AlertTitle><AlertDescription>{state.result.fatalError}</AlertDescription></Alert>}
@@ -182,5 +196,5 @@ export default function App() {
       <Field><FieldLabel>{t('saveLocation')}</FieldLabel><p className="helper break-all">{state.directory}</p><Button variant="outline" disabled={locked||!desktop} onClick={async()=>{const path=await open({directory:true,multiple:false});if(path)await run('configure',{directory:path})}}>{t('choose')}</Button></Field><Button variant="outline" disabled={!desktop} onClick={()=>void run('open-folder')}><FolderOpen data-icon="inline-start"/>{t('openFolder')}</Button>{recorderButton}
     </FieldGroup>}
     {tab==='quit'&&<FieldGroup><p>{t('quitHelp')}</p><Button variant="outline" onClick={()=>void hide()}>{t('keep')}</Button>{state.phase==='recording'&&<Button onClick={()=>void run('stop')}>{t('stopSave')}</Button>}{state.phase==='countdown'&&<Button onClick={()=>void run('cancel')}>{t('cancel')}</Button>}<Button variant="destructive" disabled={locked||!desktop} onClick={()=>void invoke('quit_app').catch(e=>setError(String(e)))}>{t('exit')}</Button></FieldGroup>}
-  </main></TooltipProvider>
+  </main></div></TooltipProvider>
 }

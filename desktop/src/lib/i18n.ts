@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 const zh = {
+  currentSystem:'当前系统为{{mode}}。',
   display:'显示器',mirror:'镜像预览',previewLayout:'预览布局',small:'小窗',fill:'铺满',previewPosition:'预览位置',
   topLeft:'左上',topRight:'右上',bottomLeft:'左下',bottomRight:'右下',manual:'手动位置',dragPreview:'拖动摄像头预览可调整位置。',
   missingSelection:'所选设备已断开',inputLevel:'输入电平',audioScreenHelp:'麦克风音轨写入屏幕视频。',promptResume:'继续提词',
@@ -18,6 +19,7 @@ const zh = {
   integration:'Mac 第一阶段 · 内部验证版',capability:'输出分辨率与桌面录制区域大小分别设置。实际能力不足时会提示原因。',previewOnly:'预览布局不改变摄像头原片。',sizeApplied:'当前输出',
 }
 const en: Record<keyof typeof zh,string> = {
+  currentSystem:'System appearance: {{mode}}.',
   display:'Display',mirror:'Mirror preview',previewLayout:'Preview layout',small:'Small',fill:'Fill',previewPosition:'Preview position',
   topLeft:'Top left',topRight:'Top right',bottomLeft:'Bottom left',bottomRight:'Bottom right',manual:'Manual position',dragPreview:'Drag the camera preview to position it.',
   missingSelection:'Selected device disconnected',inputLevel:'Input level',audioScreenHelp:'Microphone audio is written to the screen video.',promptResume:'Resume prompter',
