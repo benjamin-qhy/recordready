@@ -7,6 +7,12 @@ export async function native(action: string, args: Record<string,unknown> = {}):
   return invoke('native_request', {request:{action,...args}})
 }
 export let returnFocus: HTMLElement | null = null
+export async function menuAnchor(trigger: HTMLElement) {
+  const window = getCurrentWindow()
+  const scale = await window.scaleFactor(), origin = await window.outerPosition()
+  const rect = trigger.getBoundingClientRect()
+  return [origin.x / scale + rect.x, origin.y / scale + rect.y, rect.width, rect.height]
+}
 export async function section(name: string, trigger?: HTMLElement) {
   returnFocus = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
   if (desktop) {

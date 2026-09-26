@@ -142,6 +142,33 @@ enum ProbeError: Error, LocalizedError {
     var errorDescription: String? { if case .message(let s) = self { return s }; return nil }
 }
 
+struct RecordingPauseClock {
+    private(set) var isPaused = false
+    private var pausedAt = CMTime.invalid
+    private var pausedDuration = CMTime.zero
+    private var minimumAcceptedTime = CMTime.invalid
+
+    mutating func pause(at time:CMTime) {
+        guard !isPaused, time.isNumeric else { return }
+        pausedAt = time; isPaused = true
+    }
+
+    mutating func resume(at time:CMTime) {
+        guard isPaused, pausedAt.isNumeric, time.isNumeric else { return }
+        pausedDuration = CMTimeAdd(pausedDuration,CMTimeMaximum(.zero,CMTimeSubtract(time,pausedAt)))
+        pausedAt = .invalid; minimumAcceptedTime = time; isPaused = false
+    }
+
+    func accepts(_ time:CMTime) -> Bool {
+        !isPaused && time.isNumeric && (!minimumAcceptedTime.isNumeric || time >= minimumAcceptedTime)
+    }
+
+    func outputTime(at time:CMTime,epoch:CMTime) -> CMTime {
+        let effective = isPaused && pausedAt.isNumeric ? pausedAt : time
+        return CMTimeSubtract(CMTimeSubtract(effective,epoch),pausedDuration)
+    }
+}
+
 // Lifecycle is serialized by Recorder; setup completes before publishing the
 // engine. Sample mutations use queue; stop drains it before finishing writers.
 final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
@@ -167,6 +194,7 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
     var observers: [NSObjectProtocol] = []
     var screenPacer = ScreenFramePacer()
     var pacingTimer: DispatchSourceTimer?
+    var pauseClock = RecordingPauseClock()
 
     deinit { observers.forEach(NotificationCenter.default.removeObserver) }
 
@@ -270,14 +298,15 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         try await newStream.startCapture()
         queue.sync {
             epoch = CMClockGetTime(CMClockGetHostTimeClock())
+            pauseClock = RecordingPauseClock()
             screenPacer = ScreenFramePacer()
             recording = true
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now(), repeating: 1.0 / 30)
             timer.setEventHandler { [weak self] in
-                guard let self = self, self.recording else { return }
+                guard let self = self, self.recording, !self.pauseClock.isPaused else { return }
                 // Allow capture callbacks a small delivery margin; stop flushes the tail.
-                let end = CMTimeSubtract(CMTimeSubtract(CMClockGetTime(CMClockGetHostTimeClock()), self.epoch), CMTime(value: 1, timescale: 10))
+                let end = CMTimeSubtract(self.pauseClock.outputTime(at:CMClockGetTime(CMClockGetHostTimeClock()),epoch:self.epoch),CMTime(value:1,timescale:10))
                 do { try self.screenPacer.flush(until: end) { try self.screenFile?.append($0, video: true, requireReady: true) } }
                 catch { self.fail(error) }
             }
@@ -289,7 +318,8 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
     func normalized(_ sample: CMSampleBuffer, from clock: CMClock) throws -> CMSampleBuffer? {
         let original = CMSampleBufferGetPresentationTimeStamp(sample)
         let hostPTS = CMSyncConvertTime(original, from: clock, to: CMClockGetHostTimeClock())
-        let pts = CMTimeSubtract(hostPTS, epoch)
+        guard pauseClock.accepts(hostPTS) else { return nil }
+        let pts = pauseClock.outputTime(at:hostPTS,epoch:epoch)
         guard pts.isNumeric else { throw ProbeError.message("时钟映射无效") }
         // Whole pre-epoch buffers are dropped in this minimal experiment; record the first
         // actual sample offset instead of independently zeroing each source.
@@ -304,9 +334,9 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         }
         guard result == noErr else { throw ProbeError.message("读取时间信息失败") }
         for i in timing.indices {
-            timing[i].presentationTimeStamp = CMTimeSubtract(CMSyncConvertTime(timing[i].presentationTimeStamp, from: clock, to: CMClockGetHostTimeClock()), epoch)
+            timing[i].presentationTimeStamp = pauseClock.outputTime(at:CMSyncConvertTime(timing[i].presentationTimeStamp, from: clock, to: CMClockGetHostTimeClock()),epoch:epoch)
             if timing[i].decodeTimeStamp.isNumeric {
-                timing[i].decodeTimeStamp = CMTimeSubtract(CMSyncConvertTime(timing[i].decodeTimeStamp, from: clock, to: CMClockGetHostTimeClock()), epoch)
+                timing[i].decodeTimeStamp = pauseClock.outputTime(at:CMSyncConvertTime(timing[i].decodeTimeStamp, from: clock, to: CMClockGetHostTimeClock()),epoch:epoch)
             }
         }
         var output: CMSampleBuffer?
@@ -332,8 +362,18 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         recording = false
         DispatchQueue.main.async { self.onFailure?(error.localizedDescription) }
     }
+    func setPaused(_ paused:Bool) {
+        queue.sync {
+            let now = CMClockGetTime(CMClockGetHostTimeClock())
+            if paused { pauseClock.pause(at:now) }
+            else { pauseClock.resume(at:now) }
+        }
+    }
+    var elapsed:Double {
+        queue.sync { max(0,pauseClock.outputTime(at:CMClockGetTime(CMClockGetHostTimeClock()),epoch:epoch).seconds) }
+    }
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard recording, type == .screen, CMSampleBufferIsValid(sampleBuffer) else { return }
+        guard recording, !pauseClock.isPaused, type == .screen, CMSampleBufferIsValid(sampleBuffer) else { return }
         guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
               let status = attachments.first?[.status] as? Int, status == SCFrameStatus.complete.rawValue else { return }
         do {
@@ -349,7 +389,7 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         if output is AVCaptureAudioDataOutput, let channel = connection.audioChannels.first {
             latestAudioLevel = min(1, max(0, pow(10, Double(channel.averagePowerLevel) / 20)))
         }
-        guard recording else { return }
+        guard recording, !pauseClock.isPaused else { return }
         do {
             guard let clock = session.synchronizationClock else { throw ProbeError.message("相机/音频没有同步时钟") }
             guard let sample = try normalized(sampleBuffer, from: clock) else { return }
@@ -366,7 +406,8 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         queue.sync {
             pacingTimer?.cancel(); pacingTimer = nil
             if recording {
-                do { try screenPacer.flush(until: CMTimeSubtract(CMClockGetTime(CMClockGetHostTimeClock()), epoch)) {
+                let end = pauseClock.outputTime(at:CMClockGetTime(CMClockGetHostTimeClock()),epoch:epoch)
+                do { try screenPacer.flush(until:end) {
                     try screenFile?.append($0, video: true, requireReady: true)
                 } } catch { fail(error) }
             }
@@ -380,6 +421,7 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         metadata["screen"] = screenFile?.summary()
         metadata["screenRepeatedFrames"] = screenPacer.repeatedFrames
         metadata["screenFrameRatePolicy"] = "constant-30-repeat-latest"
+        metadata["recordingElapsed"] = pauseClock.outputTime(at:CMClockGetTime(CMClockGetHostTimeClock()),epoch:epoch).seconds
         metadata["camera"] = cameraFile?.summary()
         metadata["saveResults"] = ["screen": a, "camera": b]
         metadata["fatalError"] = fatalError as Any? ?? NSNull()
