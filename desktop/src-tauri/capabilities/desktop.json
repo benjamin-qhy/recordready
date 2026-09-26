@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "windows": [
+    "main",
+    "settings",
+    "prompter",
+    "region"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-start-dragging",
+    "dialog:allow-open"
+  ]
+}

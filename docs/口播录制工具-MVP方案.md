@@ -89,7 +89,7 @@
 |---|---|---|
 | 桌面容器 | Tauri 2 | 跨平台窗口、打包、系统权限、前后端通信 |
 | 界面 | React + TypeScript + Vite | 单一录制界面及就近配置浮层 |
-| UI 组件与样式 | shadcn/ui（Radix）+ Tailwind CSS，Lucide React 图标 | 统一组件、橙色语义主题与可访问交互；设计规范待选稿后编写 |
+| UI 组件与样式 | shadcn/ui（Radix）+ Tailwind CSS，Lucide React 图标 | 统一组件、橙色语义主题与可访问交互；设计规范见根目录 design.md |
 | 本地服务 | Rust | 会话、设备、轨道生命周期、保存和错误状态 |
 | macOS 屏幕采集 | ScreenCaptureKit | 捕获屏幕/窗口，排除应用自身浮窗 |
 | Windows 屏幕采集 | Windows.Graphics.Capture | 获取系统显示器/窗口帧 |
@@ -281,7 +281,7 @@ AI 眼神校正、字幕、剪辑、云同步、系统声音、虚拟摄像头�
 
 ## 设计确认前置条件
 
-用户要求先完成橙色主题系统 UI 设计稿并选定方向，前端采用 shadcn/ui。AI 设计设计规范待选稿后编写。设计稿选定和规范确认之后，仍需另行取得正式开发批准；此前开发确认请求暂不执行。
+用户要求先完成橙色主题系统 UI 设计稿并选定方向，前端采用 shadcn/ui。AI 设计设计规范见根目录 design.md。设计稿选定和规范确认之后，仍需另行取得正式开发批准；此前开发确认请求暂不执行。
 
 ## 已确认的视觉基底、外观与语言（2026-09-24）
 
@@ -295,4 +295,7 @@ UI 使用 shadcn/ui（Radix）与 Tailwind CSS；外观提供“跟随系统 / �
 
 需用较长英文检查控件宽度、浮层换行及键盘焦点，不以截断关键动作来容纳翻译。设置切换即生效，不新增“应用”按钮；尺寸自定义仍保留其明确应用操作。
 
-依据：[shadcn/ui Vite 外观切换](https://ui.shadcn.com/docs/dark-mode/vite)、[shadcn/ui 语义主题](https://ui.shadcn.com/docs/theming)、[react-i18next](https://react.i18next.com/latest)。当前只记录设计与技术方案，未安装依赖、未实现正式功能。design.md 保持删除状态，完整设计稿确认后再编写；选定视觉基底并不等于正式开发批准。
+依据：[shadcn/ui Vite 外观切换](https://ui.shadcn.com/docs/dark-mode/vite)、[shadcn/ui 语义主题](https://ui.shadcn.com/docs/theming)、[react-i18next](https://react.i18next.com/latest)。当前只记录设计与技术方案，未安装依赖、未实现正式功能。2026-09-25：用户已选定六张扩展稿并跳过其余状态出图。[design.md](../design.md) 已编写，含校正、主题、多语言与未出图状态规则，待审阅；正式开发仍需明确批准。
+
+
+2026-09-25 当前状态：六张设计稿、design.md 及校正说明已获审阅，Mac 第一阶段开发已获授权并完成内部测试构建。上文较早的“待批准/待审阅/未实现”表述为历史记录；当前实现与未测项以 [集中测试报告](Mac第一阶段集中测试报告.md) 为准。第二阶段和分发仍未启动。

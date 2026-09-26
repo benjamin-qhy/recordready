@@ -1,0 +1,89 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "RecordReady",
+  "version": "0.1.0",
+  "identifier": "com.recordready.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "RecordReady",
+        "label": "main",
+        "visible": false,
+        "width": 850,
+        "height": 84,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "fullscreen": false,
+        "transparent": true
+      },
+      {
+        "label": "settings",
+        "title": "RecordReady",
+        "url": "index.html?view=settings",
+        "width": 360,
+        "height": 510,
+        "visible": false,
+        "alwaysOnTop": true,
+        "decorations": false,
+        "resizable": false,
+        "transparent": true
+      },
+      {
+        "label": "prompter",
+        "acceptFirstMouse": true,
+        "title": "RecordReady",
+        "url": "index.html?view=prompter",
+        "width": 640,
+        "height": 40,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "transparent": true
+      },
+      {
+        "label": "region",
+        "title": "RecordReady",
+        "url": "index.html?view=region",
+        "width": 520,
+        "height": 88,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "transparent": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420"
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "infoPlist": "Info.plist"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}
