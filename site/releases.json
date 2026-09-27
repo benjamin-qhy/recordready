@@ -1,0 +1,67 @@
+{
+  "releases": [
+    {
+      "version": "0.1.0-beta.2",
+      "build": 10002,
+      "date": "2026-09-27T07:38:24.437Z",
+      "sourceCommit": "2d4659f1e18e3706a04558b045ab923044ec2c73",
+      "workingTree": true,
+      "minMacOS": "13.0",
+      "signing": "ad-hoc",
+      "notes": {
+        "zh-CN": "递增验证版，用于验证从首版下载、更新检查、增量下载到安全重启安装的完整流程。",
+        "en-US": "Incremented validation build for the full first-install, update check, delta download and safe restart installation flow."
+      },
+      "dmg": {
+        "name": "RecordReady-0.1.0-beta.2-macos-arm64.dmg",
+        "bytes": 5187707,
+        "sha256": "0b3db699793e1da98d49f338ba9563dd2e2c718a7f802e2574d5188f016f70fb",
+        "url": "https://recordready.qiushui.me/releases/0.1.0-beta.2/RecordReady-0.1.0-beta.2-macos-arm64.dmg"
+      },
+      "zip": {
+        "name": "RecordReady-0.1.0-beta.2-macos-arm64.zip",
+        "bytes": 4773947,
+        "sha256": "71f90cb1614a1455f9cec97e037aaf453c4e7b0f4099e754277a6ccb24c2ca33",
+        "url": "https://recordready.qiushui.me/releases/0.1.0-beta.2/RecordReady-0.1.0-beta.2-macos-arm64.zip"
+      },
+      "signature": "GCnhaKSP3XXbSHB62QErFY8mj+lo2Vqxnwzg8EKd9J5+PPpQ7kDK640d/60cFzaqpnnLpsCOrIYBiBlJryS9BQ==",
+      "deltas": [
+        {
+          "name": "RecordReady-0.1.0-beta.2-from-10001-macos-arm64.delta",
+          "fromBuild": 10001,
+          "bytes": 2582,
+          "sha256": "32baa1221769dd81988516c1d983c758be5266e2dcc818a1975cf4e3c1078b73",
+          "signature": "0N9yjGdhByr3K4mQYEDcrqlY/jSZkEIs9R6cUs4pGkfpGX6PqmBjLJOk2t5Ma4C099EbZm3hlt7BoHkYpMy7Dg==",
+          "url": "https://recordready.qiushui.me/releases/0.1.0-beta.2/RecordReady-0.1.0-beta.2-from-10001-macos-arm64.delta"
+        }
+      ]
+    },
+    {
+      "version": "0.1.0-beta.1",
+      "build": 10001,
+      "date": "2026-09-27T07:36:50.298Z",
+      "sourceCommit": "2d4659f1e18e3706a04558b045ab923044ec2c73",
+      "workingTree": true,
+      "minMacOS": "13.0",
+      "signing": "ad-hoc",
+      "notes": {
+        "zh-CN": "首个支持应用内更新的内测版：口播录制、独立摄像头原片与手动确认安装更新。",
+        "en-US": "First beta with in-app updates: screen recording, separate camera footage and user-confirmed update installation."
+      },
+      "dmg": {
+        "name": "RecordReady-0.1.0-beta.1-macos-arm64.dmg",
+        "bytes": 5187694,
+        "sha256": "d1cc5a102544e7cfd33fbce28bfc14e49de2fc2d287c34dde09fdc61eb830f0c",
+        "url": "https://recordready.qiushui.me/releases/0.1.0-beta.1/RecordReady-0.1.0-beta.1-macos-arm64.dmg"
+      },
+      "zip": {
+        "name": "RecordReady-0.1.0-beta.1-macos-arm64.zip",
+        "bytes": 4773946,
+        "sha256": "74d35047b05782c4b1aeb5e11fcfc02a658994573cb2fa21713ec439badf8b70",
+        "url": "https://recordready.qiushui.me/releases/0.1.0-beta.1/RecordReady-0.1.0-beta.1-macos-arm64.zip"
+      },
+      "signature": "L3Q7kJoZbQTPRd0zkTD9YPNgpyeTYw19wj4H5ihnhYKVRDt3ysvRy12UPJG+NIB7/wwyPy/xW399z9DBZZJCAw==",
+      "deltas": []
+    }
+  ]
+}
