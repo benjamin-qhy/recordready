@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>EffectsProbe</string>
+<key>CFBundleIdentifier</key><string>com.recordready.effects-probe</string>
+<key>CFBundleName</key><string>RecordReady Effects Probe</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSMinimumSystemVersion</key><string>13.0</string>
+<key>NSCameraUsageDescription</key><string>使用真实摄像头验证磨皮、瘦脸与人像补光，图像仅在本机处理。</string>
+<key>NSHighResolutionCapable</key><true/>
+</dict></plist>
