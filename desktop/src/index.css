@@ -218,7 +218,7 @@ html[data-view=region],html[data-view=region] body { overflow:hidden; }
 }
 .region-config-toolbar .region-options { flex:0 0 auto; }
 .region-config-toolbar .region-options select { width:82px; height:32px; }
-.region-config-toolbar .region-custom { display:flex; flex:1 1 auto; flex-wrap:nowrap; gap:5px; min-width:0; }
+.region-config-toolbar .region-custom { display:flex; flex:0 0 auto; flex-wrap:nowrap; gap:5px; min-width:0; }
 .region-config-toolbar .region-custom label { gap:4px; }
 .region-config-toolbar .region-custom input { width:68px; height:32px; }
 .region-config-toolbar .region-custom [role=alert] { position:absolute; left:100px; bottom:0; white-space:nowrap; }
@@ -247,3 +247,22 @@ html[data-view=region],html[data-view=region] body { overflow:hidden; }
 [data-slot=button].window-close { width:36px; min-width:36px; height:36px; min-height:36px; padding:0; flex-shrink:0; }
 [data-slot=button].window-close svg { width:20px; height:20px; stroke-width:2; }
 .settings header [data-slot=button].window-close { width:36px; min-width:36px; height:36px; min-height:36px; }
+
+.beauty-settings {display:flex;flex-direction:column;gap:12px}
+.beauty-settings h2 {font-size:14px;font-weight:600;margin:0}
+.beauty-system {width:100%;justify-content:space-between}
+.beauty-enable {display:flex;align-items:center;justify-content:space-between;border-block:1px solid var(--border);padding:14px 0;gap:12px}
+.beauty-group {background:var(--muted);border-radius:10px;padding:12px;display:grid;gap:16px}
+.beauty-slider {display:grid;grid-template-columns:108px minmax(50px,1fr) 36px;align-items:center;gap:8px;font-size:12px}
+.beauty-slider input {width:100%;accent-color:var(--primary);cursor:pointer}
+.beauty-slider output {text-align:right;font-variant-numeric:tabular-nums}
+.beauty-actions {display:flex;gap:10px;margin-top:4px}.beauty-actions>* {flex:1}
+.beauty-settings .helper {font-size:12px;display:flex;gap:6px;align-items:center}
+
+.beauty-system-section {border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:12px}
+
+.quality-select {display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}.quality-select select {height:32px;border-radius:6px;background:var(--muted);padding:2px 7px}.quality-camera {position:absolute;top:52px;left:8px;font-size:11px;color:var(--muted-foreground);background:var(--background);padding:2px 6px;border-radius:4px}
+
+.region-panel.region-config-toolbar .region-error {top:78px}
+
+.region-config-toolbar .quality-divider {height:24px;flex:0 0 1px;margin-inline:3px}

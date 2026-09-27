@@ -277,12 +277,14 @@ final class PreviewDragView: DragHandle {
     let preferences: UserDefaults
     init(preferences: UserDefaults = .standard) {
         self.preferences = preferences
+        self.beautySettings=BeautySettings(preferences.dictionary(forKey:"beautySettings") ?? [:])
         super.init()
         theme = NSApplication.shared.effectiveAppearance.bestMatch(from:[.aqua,.darkAqua]) == .darkAqua ? "dark" : "light"
         if let savedOpacity = preferences.object(forKey:"promptOpacity") as? Double, savedOpacity.isFinite, (0...1).contains(savedOpacity) { promptOpacity = savedOpacity }
         if let saved = preferences.dictionary(forKey: "recordingConfiguration"),
            let w = saved["width"] as? Int, let h = saved["height"] as? Int,
            w >= 240, w <= 3840, h >= 240, h <= 3840, w % 2 == 0, h % 2 == 0 {
+            quality = RecordingQuality.levels.contains(saved["quality"] as? Int ?? 1080) ? (saved["quality"] as? Int ?? 1080) : 1080
             width = w; height = h
             camera = saved["camera"] as? Bool ?? false
             microphone = saved["microphone"] as? Bool ?? false
@@ -329,12 +331,29 @@ final class PreviewDragView: DragHandle {
     var previewResizers: [CapturePanel] = []
     var phase = "idle" { didSet { updateInteraction() } }
     var error = ""
+    var quality = 1080
     var width = 1080, height = 1920
     var camera = false, microphone = false
     var cameraID = "", microphoneID = ""
     var mirror = false, previewShape = "square", previewLayout = "small", previewPosition = "bottom-right"
     var previewManual = CGPoint(x:1,y:0)
-    var previewLayer: AVCaptureVideoPreviewLayer?
+    var previewLayer: AVSampleBufferDisplayLayer?
+    var beautySettings=BeautySettings()
+    let previewMailbox=CameraPreviewMailbox()
+    func connectBeauty(_ e:Engine) {
+        e.queue.sync {e.beauty.settings=self.beautySettings}
+        let mailbox=previewMailbox
+        e.onCameraFrame = { [weak self, weak e] sample in
+            mailbox.submit(sample) { [weak self, weak e] frame in
+                guard let self,let e,self.engine === e,let layer=self.previewLayer else {return}
+                var copy:CMSampleBuffer?
+                guard CMSampleBufferCreateCopy(allocator:kCFAllocatorDefault,sampleBuffer:frame,sampleBufferOut:&copy)==noErr,let copy else {return}
+                if let attachments=CMSampleBufferGetSampleAttachmentsArray(copy,createIfNecessary:true) as? [NSMutableDictionary] {attachments.first?[kCMSampleAttachmentKey_DisplayImmediately] = true}
+                if layer.status == .failed {layer.flush()}
+                if layer.isReadyForMoreMediaData {layer.enqueue(copy)}
+            }
+        }
+    }
     var overlaysVisible = false
     var promptStarted = false
     var promptVisible = false
@@ -380,7 +399,7 @@ final class PreviewDragView: DragHandle {
     }
 
     func persistConfiguration() {
-        preferences.set(["width":width,"height":height,"camera":camera,"microphone":microphone,"directory":artifacts.path,"cameraID":cameraID,"microphoneID":microphoneID,"displayID":displayID],forKey:"recordingConfiguration")
+        preferences.set(["quality":quality,"width":width,"height":height,"camera":camera,"microphone":microphone,"directory":artifacts.path,"cameraID":cameraID,"microphoneID":microphoneID,"displayID":displayID],forKey:"recordingConfiguration")
     }
 
     func panel(_ rect: CGRect, passthrough: Bool) -> CapturePanel {
@@ -582,7 +601,7 @@ final class PreviewDragView: DragHandle {
                 }
             }
             previewLayer?.removeFromSuperlayer()
-            let layer = AVCaptureVideoPreviewLayer(session: engine.session)
+            let layer = AVSampleBufferDisplayLayer()
             previewLayer = layer
             preview?.contentView?.layer?.insertSublayer(layer, at:0)
             layoutPreview()
@@ -720,6 +739,9 @@ final class PreviewDragView: DragHandle {
             }
           }
             item(zh ? "左右翻转" : "Flip horizontally",checked:mirror,data:["action":"preview","mirror":!mirror],into:menu)
+            menu.addItem(.separator())
+            item(zh ? "macOS 摄像头效果…":"macOS Camera Effects…",checked:false,data:["action":"system-camera-effects"],into:menu)
+            item(zh ? "美颜与补光…":"Beauty & Lighting…",checked:false,data:["action":"beauty-panel"],into:menu)
             for entry in menu.items where !entry.isSeparatorItem { entry.isEnabled = entry.isEnabled && camera }
             return menu
         }
@@ -761,10 +783,7 @@ final class PreviewDragView: DragHandle {
         mask.path = previewOutline(mask.bounds,circular:circular)
         previewLayer?.mask = mask
         previewLayer?.videoGravity = .resizeAspectFill
-        if let connection = previewLayer?.connection, connection.isVideoMirroringSupported {
-            connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = mirror
-        }
+        previewLayer?.transform = CATransform3DMakeScale(mirror ? -1:1,1,1)
         CATransaction.commit()
         layoutResizeHandles(previewResizers,around:rect,visible:camera && preview.isVisible && previewLayout == "small")
         persistLayout()
@@ -818,10 +837,11 @@ final class PreviewDragView: DragHandle {
         let toolbarHeight = promptToolbarHeight(body.width)
         let promptBar = CGRect(x:body.minX,y:body.minY-toolbarHeight,width:body.width,height:toolbarHeight)
         let toolbarFrames = [screen.visibleFrame] + NSScreen.screens.filter { $0 != screen }.map(\.visibleFrame)
-        let sizeBar = regionToolbarPlacement(region:region,size:CGSize(width:520,height:88),visibleFrames:toolbarFrames)
-        return ["phase": phase, "error": error, "remaining": remaining,
+        let sizeBar = regionToolbarPlacement(region:region,size:CGSize(width:620,height:120),visibleFrames:toolbarFrames)
+        return ["beauty":beautySettings.json,"systemCameraEffectsAvailable":true,"phase": phase, "error": error, "remaining": remaining,
                 "monitoringActive":engine?.session.isRunning ?? false,"cameraReady":deviceReady(.video),"microphoneReady":deviceReady(.audio),"monitorError":monitorError,
                 "elapsed": engine.map { phase == "recording" || phase == "paused" ? $0.elapsed : 0 } ?? 0,
+                "quality": quality, "cameraResolution": engine?.session.inputs.compactMap { $0 as? AVCaptureDeviceInput }.first(where: { $0.device.hasMediaType(.video) }).map { input in let d=CMVideoFormatDescriptionGetDimensions(input.device.activeFormat.formatDescription); return "\(d.width)×\(d.height)" } ?? "",
                 "width": width, "height": height, "camera": camera, "microphone": microphone,
                 "defaultCameraID":AVCaptureDevice.default(for:.video)?.uniqueID ?? "","defaultMicrophoneID":AVCaptureDevice.default(for:.audio)?.uniqueID ?? "","regionUI":uiRect(region),"catalog":deviceCatalog,"cameraID":cameraID,"microphoneID":microphoneID,"displayID":String(displayID),
                 "mirror":mirror,"previewShape":previewShape,"previewLayout":previewLayout,"previewPosition":previewPosition,"promptStarted":promptStarted,"promptVisible":promptVisible,"scriptText":preferences.string(forKey:"script") ?? "",
@@ -850,7 +870,7 @@ final class PreviewDragView: DragHandle {
             let plan = monitoringDevices(camera:camera,microphone:microphone,cameraAuthorized:cameraAuthorization() == .authorized,microphoneAuthorized:microphoneAuthorization() == .authorized)
             monitorError = camera && !plan[0] ? "camera_permission" : microphone && !plan[1] ? "microphone_permission" : ""
             error = monitorError
-            if let current = engine, current.cameraEnabled == plan[0], current.microphoneEnabled == plan[1], current.cameraID == cameraID, current.microphoneID == microphoneID, current.session.isRunning {
+            if let current = engine, current.quality == quality, current.cameraEnabled == plan[0], current.microphoneEnabled == plan[1], current.cameraID == cameraID, current.microphoneID == microphoneID, current.session.isRunning {
                 showCameraPreview(); return
             }
             if let old = engine {
@@ -858,7 +878,7 @@ final class PreviewDragView: DragHandle {
                 engine = nil
             }
             guard plan[0] || plan[1] else { showCameraPreview(); return }
-            let e = Engine(); e.cameraEnabled = plan[0]; e.microphoneEnabled = plan[1]; e.cameraID = cameraID; e.microphoneID = microphoneID
+            let e = Engine(); e.quality = quality; e.cameraEnabled = plan[0]; e.microphoneEnabled = plan[1]; e.cameraID = cameraID; e.microphoneID = microphoneID
             try await withCheckedThrowingContinuation { (c:CheckedContinuation<Void,Error>) in
                 e.setupQueue.async {
                     do { try e.configureDevices(); e.session.startRunning(); c.resume() }
@@ -866,6 +886,7 @@ final class PreviewDragView: DragHandle {
                 }
             }
             engine = e
+            connectBeauty(e)
             observeMonitoring(e)
             e.onFailure = { [weak self] message in Task { @MainActor in self?.monitorError = message } }
             showCameraPreview()
@@ -888,7 +909,7 @@ final class PreviewDragView: DragHandle {
                 await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in old.setupQueue.async { old.session.stopRunning(); c.resume() } }
             }
             guard NSScreen.screens.contains(where: { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID }) else { throw ProbeError.message("display_missing") }
-            let e = Engine(); e.cameraEnabled = camera; e.microphoneEnabled = microphone
+            let e = Engine(); e.quality = quality; e.cameraEnabled = camera; e.microphoneEnabled = microphone
             e.cameraID = cameraID; e.microphoneID = microphoneID
             let needsSession = camera || microphone
             try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
@@ -898,6 +919,7 @@ final class PreviewDragView: DragHandle {
                 }
             }
             engine = e
+            connectBeauty(e)
             monitorError = ""; observeMonitoring(e)
             e.onFailure = { [weak self] message in
                 Task { @MainActor in
@@ -926,7 +948,8 @@ final class PreviewDragView: DragHandle {
         // AppKit origin is lower-left; ScreenCaptureKit sourceRect is display-local top-left.
         let source = CGRect(x: region.minX - screen.frame.minX, y: screen.frame.maxY - region.maxY, width: region.width, height: region.height)
         do {
-            try await engine.start(displayID: displayID, rectangle: source, outputWidth: width, outputHeight: height)
+            let output=RecordingQuality.dimensions(width:width,height:height,quality:quality)
+            try await engine.start(displayID: displayID, rectangle: source, outputWidth: output.0, outputHeight: output.1)
             startedAt = Date(); phase = "recording"
         } catch {
             self.error = error.localizedDescription
@@ -953,6 +976,18 @@ final class PreviewDragView: DragHandle {
 
     func request(_ data: [String: Any]) async throws -> [String: Any] {
         switch data["action"] as? String {
+        case "system-camera-effects":
+            guard camera, engine?.session.isRunning == true else {throw ProbeError.message("camera_permission")}
+            AVCaptureDevice.showSystemUserInterface(.videoEffects)
+        case "beauty-panel": uiCallback?("beauty")
+        case "beauty":
+            var values=beautySettings.json
+            for key in ["enabled","smoothing","slim","front","left","right"] {if let value=data[key] {values[key]=value}}
+            beautySettings=BeautySettings(values)
+            preferences.set(beautySettings.json,forKey:"beautySettings")
+            if let e=engine {let settings=beautySettings;e.queue.async {e.beauty.settings=settings;e.beauty.oldParameters=nil}}
+        case "beauty-compare":
+            if let e=engine {let active=data["active"] as? Bool ?? false;e.queue.async {e.beautyCompare=active}}
         case "status": break
         case "restore-session":
             if !restoredSession {
@@ -1019,6 +1054,8 @@ final class PreviewDragView: DragHandle {
         case "cancel": if phase == "countdown" { generation += 1; phase = "ready"; remaining = 0 }
         case "configure":
             guard !locked else { throw ProbeError.message("session_busy") }
+            let nextQuality = data["quality"] as? Int ?? quality
+            guard RecordingQuality.levels.contains(nextQuality) else { throw ProbeError.message("invalid_quality") }
             let w = data["width"] as? Int ?? width, h = data["height"] as? Int ?? height
             guard w >= 240, h >= 240, w <= 3840, h <= 3840, w % 2 == 0, h % 2 == 0 else { throw ProbeError.message("invalid_size") }
             let nextCamera = data["cameraID"] as? String ?? cameraID
@@ -1035,8 +1072,9 @@ final class PreviewDragView: DragHandle {
             }
             let nextCameraEnabled = data["camera"] as? Bool ?? camera
             let nextMicrophoneEnabled = data["microphone"] as? Bool ?? microphone
-            let devicesChanged = nextCamera != cameraID || nextMicrophone != microphoneID || nextCameraEnabled != camera || nextMicrophoneEnabled != microphone
+            let devicesChanged = nextQuality != quality || nextCamera != cameraID || nextMicrophone != microphoneID || nextCameraEnabled != camera || nextMicrophoneEnabled != microphone
             let relocate = w != width || h != height || nextDisplay != displayID
+            quality = nextQuality
             width = w; height = h
             cameraID = nextCamera; microphoneID = nextMicrophone; displayID = nextDisplay
             camera = nextCameraEnabled; microphone = nextMicrophoneEnabled

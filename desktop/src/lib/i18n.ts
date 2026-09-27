@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 const zh = {
+  invalid_quality:'请选择有效的清晰度。',camera_quality_unsupported:'摄像头没有适用于此档位的 30 帧模式，请选择更高清晰度或其他摄像头。',
   opacity:'背景',ratio:'比例',fontDown:'减小字号',fontUp:'增大字号',speedDown:'减速',speedUp:'加速',quitConfirm:'确定退出 RecordReady 吗？',
   area:'区域',video:'视频',voice:'语音',scriptNav:'口播稿',settingsNav:'设置',cameraOff:'不录制摄像头',recordingControls:'录制控制',
   captureSize:'范围',position:'位置',positionX:'选区 X 坐标',positionY:'选区 Y 坐标',applyPosition:'应用',output:'输出',cancelArea:'取消区域选择',
@@ -25,6 +26,7 @@ const zh = {
   integration:'Mac 第一阶段 · 内部验证版',capability:'输出分辨率与桌面录制区域大小分别设置。实际能力不足时会提示原因。',previewOnly:'预览布局不改变摄像头原片。',sizeApplied:'当前输出',
 }
 const en: Record<keyof typeof zh,string> = {
+  invalid_quality:'Choose a valid quality.',camera_quality_unsupported:'This camera has no 30 fps mode at this quality. Choose a higher quality or another camera.',
   opacity:'Background',ratio:'Ratio',fontDown:'Decrease font size',fontUp:'Increase font size',speedDown:'Slower',speedUp:'Faster',quitConfirm:'Quit RecordReady?',
   area:'Area',video:'Video',voice:'Audio',scriptNav:'Script',settingsNav:'Settings',cameraOff:'No camera',recordingControls:'Recording controls',
   captureSize:'Size',position:'Position',positionX:'Selection X position',positionY:'Selection Y position',applyPosition:'Apply',output:'Output',cancelArea:'Cancel area selection',

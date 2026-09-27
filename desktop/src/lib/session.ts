@@ -20,6 +20,9 @@ export function deviceLabel(devices: Device[] = [], selected = '', defaultID = '
   return devices.find(device => device.id === id)?.name ?? (selected ? missing : fallback)
 }
 export interface Snapshot {
+  quality?: number; cameraResolution?: string;
+  beauty?: import('../components/BeautySettings').BeautyValues;
+  systemCameraEffectsAvailable?: boolean;
   catalog?: { cameras: Device[]; microphones: Device[]; displays: Device[] };
   cameraID?: string; microphoneID?: string; displayID?: string;
   defaultCameraID?: string; defaultMicrophoneID?: string;
