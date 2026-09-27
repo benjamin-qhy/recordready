@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import AVFoundation
+import CoreImage
 
 // No camera, microphone or screen access. Tests the new bridge guards and writer.
 @main struct NativeTests {
@@ -9,6 +10,23 @@ import AVFoundation
         let preferences = UserDefaults(suiteName: suite)!
         defer { preferences.removePersistentDomain(forName: suite) }
         let recorder = Recorder(preferences: preferences)
+        _ = try await recorder.request(["action":"beauty","enabled":true,"smoothing":150,"left":-10,"front":40])
+        precondition(recorder.beautySettings.smoothing == 1 && recorder.beautySettings.left == 0)
+        let restoredBeauty=Recorder(preferences:preferences)
+        precondition(restoredBeauty.beautySettings.enabled && abs(restoredBeauty.beautySettings.front-0.4)<0.001)
+        _ = try await recorder.request(["action":"beauty","enabled":false])
+        precondition(!recorder.beautySettings.active && recorder.beautySettings.front>0)
+        try beautyGPUCheck(BeautyRenderer())
+        precondition(recorder.quality == 1080)
+        precondition(RecordingQuality.dimensions(width:1920,height:1080,quality:2160) == (3840,2160))
+        precondition(RecordingQuality.dimensions(width:1080,height:1920,quality:720) == (720,1280))
+        precondition(RecordingQuality.dimensions(width:1080,height:1080,quality:1440) == (2560,2560))
+        precondition(RecordingQuality.bitrate(width:3840,height:2160) > RecordingQuality.bitrate(width:1920,height:1080))
+        _ = try await recorder.request(["action":"configure","quality":1440])
+        precondition(Recorder(preferences:preferences).quality == 1440)
+        do { _ = try await recorder.request(["action":"configure","quality":123]); fatalError("invalid quality accepted") } catch {}
+        precondition(recorder.quality == 1440)
+        _ = try await recorder.request(["action":"configure","quality":1080])
         var pauseClock = RecordingPauseClock()
         pauseClock.pause(at: CMTime(seconds: 2, preferredTimescale: 600))
         precondition(pauseClock.isPaused)
@@ -37,10 +55,10 @@ import AVFoundation
         precondition(cameraMenu.items.allSatisfy { ($0.representedObject as? [String:Any])?["action"] as? String == "configure" })
         recorder.camera = true
         let standaloneMenu = try recorder.makeDeviceMenu(kind:"preview")
-        precondition(standaloneMenu.items.map { $0.title } == ["左右翻转"])
+        precondition(standaloneMenu.items.filter { !$0.isSeparatorItem }.map { $0.title } == ["左右翻转","macOS 摄像头效果…","美颜与补光…"])
         recorder.overlaysVisible = true
         let previewMenu = try recorder.makeDeviceMenu(kind:"preview")
-        precondition(previewMenu.items.filter { !$0.isSeparatorItem }.map { $0.title } == ["小窗","填满","左上","右上","左下","右下","方形","圆形","左右翻转"])
+        precondition(previewMenu.items.filter { !$0.isSeparatorItem }.map { $0.title } == ["小窗","填满","左上","右上","左下","右下","方形","圆形","左右翻转","macOS 摄像头效果…","美颜与补光…"])
         precondition(previewMenu.items.allSatisfy { $0.submenu == nil })
         recorder.previewLayout = "fill"
         let fillMenu = try recorder.makeDeviceMenu(kind:"preview")
@@ -396,4 +414,38 @@ import AVFoundation
         precondition(recorder.phase == "failed", "no successful output must not report saved")
         print("PASS: lifecycle, cancellation, validation, silent MP4, encoded CFR, injected failure, partial-save preservation, total failure")
     }
+}
+
+func beautyGPUCheck(_ renderer:BeautyRenderer) throws {
+    try renderer.setup(640,360)
+    let input=try renderer.allocate()
+    renderer.context.render(CIImage(color:CIColor(red:0.4,green:0.4,blue:0.4)).cropped(to:CGRect(x:0,y:0,width:640,height:360)),to:input)
+    var p=[SIMD4<Float>(640,360,0,0)]+Array(repeating:SIMD4<Float>.zero,count:6)
+    func pixel(_ buffer:CVPixelBuffer,_ x:Int,_ y:Int)->Int {
+        CVPixelBufferLockBaseAddress(buffer,.readOnly)
+        defer {CVPixelBufferUnlockBaseAddress(buffer,.readOnly)}
+        let base=CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to:UInt8.self)
+        return Int(base[y*CVPixelBufferGetBytesPerRow(buffer)+x*4+2])
+    }
+    let bypass=try renderer.render(input,parameters:p)
+    guard abs(pixel(bypass,320,180)-pixel(input,320,180))<=1 else {throw beautyError("零强度改变了原图")}
+    p[1]=SIMD4<Float>(160,40,320,280)
+    p[5]=SIMD4<Float>(1,1,0,0)
+    let front=try renderer.render(input,parameters:p)
+    guard pixel(front,320,180)>pixel(input,320,180)+15 else {throw beautyError("正面补光未提亮脸部")}
+    guard abs(pixel(front,10,10)-pixel(input,10,10))<=1 else {throw beautyError("局部补光影响了远处背景")}
+    p[5].x=0; p[5].w=1
+    let left=try renderer.render(input,parameters:p)
+    guard pixel(left,260,180)>pixel(left,380,180)+5 else {throw beautyError("左侧光位没有方向差异")}
+    p[5].w=0; p[6].x=1
+    let right=try renderer.render(input,parameters:p)
+    guard pixel(right,380,180)>pixel(right,260,180)+5 else {throw beautyError("右侧光位没有方向差异")}
+    p[5].x=1; p[5].w=1; p[6].x=1
+    let combined=try renderer.render(input,parameters:p)
+    guard pixel(combined,320,180)>pixel(front,320,180), pixel(combined,320,180)<240 else {throw beautyError("多光源叠加无效或过亮")}
+    guard abs(pixel(combined,260,180)-pixel(combined,380,180))<=2 else {throw beautyError("等强度左右补光不对称")}
+    p[5].y=0
+    let absent=try renderer.render(input,parameters:p)
+    guard abs(pixel(absent,320,180)-pixel(input,320,180))<=1 else {throw beautyError("无人脸时补光未关闭")}
+    print("PASS: Metal 编译、原图旁路、正面提亮、左右光位、多光叠加与亮度上限、背景保护、无人脸关闭。")
 }

@@ -59,7 +59,7 @@ async fn native_request(request: Value) -> Result<Value, String> {
 // DOM popovers cannot extend beyond their webview without a desktop-sized input window.
 #[tauri::command]
 async fn show_settings(app: tauri::AppHandle, section: String, anchor: Option<Vec<f64>>) -> Result<(), String> {
-    let allowed = ["camera", "audio", "appearance", "saveLocation", "results", "quit"];
+    let allowed = ["camera", "audio", "appearance", "saveLocation", "results", "quit", "beauty"];
     if !allowed.contains(&section.as_str()) { return Err("unknown_section".into()); }
     let state = native_request(serde_json::json!({"action":"status"})).await?;
     let window = app.get_webview_window("settings").ok_or("missing_settings")?;
@@ -67,7 +67,7 @@ async fn show_settings(app: tauri::AppHandle, section: String, anchor: Option<Ve
     let scale = main.scale_factor().map_err(|e|e.to_string())?;
     let origin = main.outer_position().map_err(|e|e.to_string())?.to_logical::<f64>(scale);
     let fallback = vec![origin.x+350.0,origin.y,32.0,32.0];
-    let native_anchor = match section.as_str() { "camera"=>rect(&state["cameraAnchor"]), _=>None };
+    let native_anchor = match section.as_str() { "camera"|"beauty"=>rect(&state["cameraAnchor"]), _=>None };
     let anchor = anchor.filter(|a|a.len()==4 && a.iter().all(|v|v.is_finite())).or_else(|| if state["overlaysVisible"]==true {native_anchor} else {None}).unwrap_or(fallback);
     let saved=window_preferences::get(&format!("settings:{section}"));
     let target=saved.unwrap_or(Point{x:anchor[0],y:anchor[1]});
@@ -78,7 +78,7 @@ async fn show_settings(app: tauri::AppHandle, section: String, anchor: Option<Ve
     });
     let monitor=monitor.or_else(||monitors.iter().find(|m|m.position().x==0&&m.position().y==0)).or_else(||monitors.first());
     let bounds = monitor.map(|m| { let area=m.work_area();let p=area.position.to_logical::<f64>(m.scale_factor()); let z=area.size.to_logical::<f64>(m.scale_factor()); [p.x+12.0,p.y+12.0,z.width-24.0,z.height-24.0] }).unwrap_or([0.0,40.0,1200.0,720.0]);
-    let (w,h): (f64,f64) = match section.as_str() { "appearance"=>(240.0,350.0),"saveLocation"=>(240.0,290.0),"quit"=>(340.0,285.0),_=>(380.0,410.0) };
+    let (w,h): (f64,f64) = match section.as_str() { "beauty"=>(380.0,640.0),"appearance"=>(240.0,350.0),"saveLocation"=>(240.0,290.0),"quit"=>(340.0,285.0),_=>(380.0,410.0) };
     let (w,h)=(w.min(bounds[2]),h.min(bounds[3]));
     let x=(anchor[0]+anchor[2]/2.0-w/2.0).clamp(bounds[0],bounds[0]+bounds[2]-w);
     let y=if anchor[1]-h-12.0>=bounds[1] {anchor[1]-h-12.0} else {(anchor[1]+anchor[3]+12.0).min(bounds[1]+bounds[3]-h).max(bounds[1])};

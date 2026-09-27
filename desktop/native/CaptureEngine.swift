@@ -14,6 +14,16 @@ func jsonWrite(_ value: Any, _ url: URL) {
     }
 }
 
+enum RecordingQuality {
+    static let levels = [720,1080,1440,2160]
+    static func longEdge(_ quality:Int) -> Int { [720:1280,1080:1920,1440:2560,2160:3840][quality] ?? 1920 }
+    static func dimensions(width:Int,height:Int,quality:Int) -> (Int,Int) {
+        let scale=Double(longEdge(quality))/Double(max(width,height))
+        return (max(2,Int((Double(width)*scale/2).rounded())*2),max(2,Int((Double(height)*scale/2).rounded())*2))
+    }
+    static func bitrate(width:Int,height:Int) -> Int { max(4_000_000,min(40_000_000,width*height*5)) }
+}
+
 final class VideoFile {
     let writer: AVAssetWriter
     let video: AVAssetWriterInput
@@ -29,7 +39,7 @@ final class VideoFile {
         video = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width, AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 4_000_000,
+            AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: RecordingQuality.bitrate(width:width,height:height),
                                               AVVideoExpectedSourceFrameRateKey: 30]
         ])
         audio = includeAudio ? AVAssetWriterInput(mediaType: .audio, outputSettings: [
@@ -180,8 +190,12 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
     var epoch = CMTime.zero
     var recording = false
     var configured = false
+    let beauty=BeautyProcessor()
+    var beautyCompare=false
+    var onCameraFrame:((CMSampleBuffer)->Void)?
     var cameraEnabled = true
     var microphoneEnabled = true
+    var quality = 1080
     var cameraID = ""
     var microphoneID = ""
     var directory: URL?
@@ -201,7 +215,6 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
     func configureDevices() throws {
         if configured { return }
         session.beginConfiguration()
-        session.sessionPreset = .hd1280x720
         defer { session.commitConfiguration() }
         for (enabled, kind) in [(cameraEnabled, AVMediaType.video), (microphoneEnabled, AVMediaType.audio)] {
             guard enabled else { continue }
@@ -213,6 +226,19 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
             session.addInput(input)
             let output: AVCaptureOutput
             if kind == .video {
+                let formats=device.formats.filter { format in
+                    let d=CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                    return max(d.width,d.height) <= RecordingQuality.longEdge(quality) && format.videoSupportedFrameRateRanges.contains { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }
+                }
+                guard let format=formats.max(by:{ a,b in
+                    let x=CMVideoFormatDescriptionGetDimensions(a.formatDescription), y=CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+                    return Int(x.width)*Int(x.height) < Int(y.width)*Int(y.height)
+                }) else { throw ProbeError.message("camera_quality_unsupported") }
+                try device.lockForConfiguration()
+                device.activeFormat=format
+                device.activeVideoMinFrameDuration=CMTime(value:1,timescale:30)
+                device.activeVideoMaxFrameDuration=CMTime(value:1,timescale:30)
+                device.unlockForConfiguration()
                 let video = AVCaptureVideoDataOutput()
                 video.alwaysDiscardsLateVideoFrames = true
                 video.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
@@ -389,10 +415,16 @@ final class Engine: NSObject, @unchecked Sendable, SCStreamOutput, SCStreamDeleg
         if output is AVCaptureAudioDataOutput, let channel = connection.audioChannels.first {
             latestAudioLevel = min(1, max(0, pow(10, Double(channel.averagePowerLevel) / 20)))
         }
+        var cameraSample=sampleBuffer
+        if output is AVCaptureVideoDataOutput {
+            do {cameraSample=try beauty.process(sampleBuffer)}
+            catch {fail(error);return}
+            onCameraFrame?(beautyCompare ? sampleBuffer:cameraSample)
+        }
         guard recording, !pauseClock.isPaused else { return }
         do {
             guard let clock = session.synchronizationClock else { throw ProbeError.message("相机/音频没有同步时钟") }
-            guard let sample = try normalized(sampleBuffer, from: clock) else { return }
+            guard let sample = try normalized(cameraSample, from: clock) else { return }
             if output is AVCaptureVideoDataOutput {
                 try cameraFile?.append(sample, video: true); log("camera", sample: sample)
             } else {

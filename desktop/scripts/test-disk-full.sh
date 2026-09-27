@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .build
-xcrun swiftc -swift-version 5 -parse-as-library native/CaptureEngine.swift native/DiskFullTests.swift -o .build/disk-full-tests
+xcrun swiftc -swift-version 5 -parse-as-library native/BeautyEffects.swift native/CaptureEngine.swift native/DiskFullTests.swift -o .build/disk-full-tests
 workspace=$(mktemp -d /tmp/recordready-diskfull.XXXXXX)
 mounted=false
 cleanup() {

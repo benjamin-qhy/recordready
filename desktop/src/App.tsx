@@ -17,6 +17,7 @@ import { desktop, native, section, returnFocus, menuAnchor } from '@/lib/native'
 import { clock, initial, isLocked, recordingControlsOnly, validSize, deviceLabel } from '@/lib/session'
 import type { Snapshot } from '@/lib/session'
 import i18n from '@/lib/i18n'
+import {BeautySettings} from '@/components/BeautySettings'
 
 const params = new URLSearchParams(location.search)
 const view = params.get('view') ?? 'main'
@@ -197,7 +198,7 @@ export default function App() {
     return items
   }
   useEffect(()=>{if(desktop&&view==='main')void native('interface',{language,theme:document.documentElement.classList.contains('dark')?'dark':'light'}).catch(e=>setError(String(e)))},[language])
-  const errorPanel = error || (view==='prompter'?'':state.error) || (view==='main'?state.monitorError:'')
+  const errorPanel = error || (view==='prompter'||(view==='settings'&&tab==='beauty')?'':state.error) || (view==='main'?state.monitorError:'')
   const recorderButton = recordingOnly ? <Button size="sm" variant="destructive" onClick={()=>void run('stop')}><Square data-icon="inline-start"/>{t('stop')}</Button>
     :state.phase==='countdown'?<Button size="sm" variant="outline" onClick={()=>void run('cancel')}>{t('cancel')} · {state.remaining}</Button>
     :<Button size="sm" disabled={!desktop||pending||locked||(view==='region'&&(dimensionsDirty||sizeError))} onClick={()=>void startRecording()}><Circle data-icon="inline-start"/>{t(locked?state.phase:'start')}</Button>
@@ -206,11 +207,16 @@ export default function App() {
   const openSettings=(name:string,element:HTMLElement)=>void section(name,element)
 
   const ratioOptions=[[1080,1920],[1920,1080],[1080,1440],[1080,1350],[1080,1080],[1440,1080]] as const
+  const outputScale=({720:1280,1080:1920,1440:2560,2160:3840}[state.quality??1080]??1920)/Math.max(state.width,state.height)
+  const screenResolution=`${Math.max(2,Math.round(state.width*outputScale/2)*2)}×${Math.max(2,Math.round(state.height*outputScale/2)*2)}`
   const regionMessage=sizeError?t('invalid_size'):errorPanel?t(errorPanel,{defaultValue:errorPanel}):''
   if(view==='region') return <main className="region-panel region-config-toolbar" {...draggable}>
     <div className="region-options"><select aria-label={t('ratio')} disabled={locked||pending} value={customSize?'custom':ratioOptions.some(([w,h])=>aspectRatio(w,h)===aspectRatio(state.width,state.height))?aspectRatio(state.width,state.height):'custom'} onChange={e=>{dimensionRevision.current++;setDimensionsDirty(false);if(e.target.value==='custom'){setWidth(String(state.width));setHeight(String(state.height));setCustomSize(true);return}const [w,h]=ratioOptions.find(([w,h])=>aspectRatio(w,h)===e.target.value)!;setWidth(String(w));setHeight(String(h));setSizeError(false);setCustomSize(false);void run('configure',{width:w,height:h})}}>{ratioOptions.map(([w,h])=><option key={`${w}x${h}`} value={aspectRatio(w,h)}>{aspectRatio(w,h)}</option>)}<option value="custom">{t('custom')}</option></select></div>
-    <div className="region-custom"><label><span>{language==='zh-CN'?'宽':'W'}</span><Input aria-label={t('width')} type="number" min={240} max={3840} step={2} value={width} disabled={locked} onChange={e=>editDimension('width',e.target.value)}/></label><span className="dimension-times">×</span><label><span>{language==='zh-CN'?'高':'H'}</span><Input aria-label={t('height')} type="number" min={240} max={3840} step={2} value={height} disabled={locked} onChange={e=>editDimension('height',e.target.value)}/></label></div>
+    <div className="region-custom"><label><span>{language==='zh-CN'?'比例宽':'W'}</span><Input aria-label={t('width')} type="number" min={240} max={3840} step={2} value={width} disabled={locked} onChange={e=>editDimension('width',e.target.value)}/></label><span className="dimension-times">×</span><label><span>{language==='zh-CN'?'比例高':'H'}</span><Input aria-label={t('height')} type="number" min={240} max={3840} step={2} value={height} disabled={locked} onChange={e=>editDimension('height',e.target.value)}/></label></div>
+    <Separator orientation="vertical" className="quality-divider"/>
+    <label className="quality-select" title={language==='zh-CN'?`屏幕与摄像头共用；摄像头按设备能力选择。${state.cameraResolution?`当前摄像头：${state.cameraResolution}`:''}`:'Applies to screen and camera; camera resolution depends on device support.'}><span>{language==='zh-CN'?'清晰度':'Quality'}</span><select aria-label={language==='zh-CN'?'录制清晰度':'Recording quality'} value={state.quality??1080} disabled={locked||pending||!desktop} onChange={e=>void run('configure',{quality:Number(e.target.value)})}>{[[720,'720p'],[1080,'1080p'],[1440,'2K'],[2160,'4K']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     <div className="region-start">{recorderButton}</div>
+    <span className="quality-camera">{language==='zh-CN'?'屏幕输出':'Screen output'}：{screenResolution}{state.camera&&state.cameraResolution?` · ${language==='zh-CN'?'摄像头实际':'Camera'}：${state.cameraResolution}`:''}</span>
     <Button className="window-close" variant="ghost" size="icon-sm" aria-label={t('cancelArea')} disabled={locked||pending} onClick={()=>void run('hide')}><X/></Button>
     {regionMessage&&<p className="compact-error region-error" role="alert"><AlertCircle/>{regionMessage}</p>}
   </main>
@@ -251,11 +257,12 @@ export default function App() {
   </main></TooltipProvider>
 
   return <TooltipProvider><div className="settings-shell"><main className={`settings settings-${tab}`} role={tab==='quit'?'alertdialog':'dialog'} aria-labelledby="settings-title" {...draggable}>
-    <header><h1 id="settings-title">{t(tab)}</h1><Button className="window-close" variant="ghost" size="icon" aria-label={t('close')} onClick={()=>void hide()}><X/></Button></header>
+    <header><h1 id="settings-title">{tab==='beauty'?(language==='zh-CN'?'美颜与补光':'Beauty & Lighting'):t(tab)}</h1><Button className="window-close" variant="ghost" size="icon" aria-label={t('close')} onClick={()=>void hide()}><X/></Button></header>
 
     {!desktop&&<Alert><AlertDescription>{t('nativeRequired')}</AlertDescription></Alert>}
     {errorPanel&&<Alert variant="destructive"><AlertCircle/><AlertTitle>{t('error')}</AlertTitle><AlertDescription>{t(errorPanel,{defaultValue:errorPanel})}</AlertDescription></Alert>}
     {locked&&!['appearance','quit','results','script'].includes(tab)&&<p className="helper">{t('locked')}</p>}
+    {tab==='beauty'&&state.beauty&&<BeautySettings initial={state.beauty} available={state.systemCameraEffectsAvailable??false} zh={language==='zh-CN'}/>}
     {tab==='appearance'&&<FieldGroup><Field><FieldLabel>{t('display')}</FieldLabel><Choice label={t('display')} value={state.displayID??''} disabled={locked} onChange={displayID=>void run('configure',{displayID})} items={deviceItems('displays',state.displayID??'')}/></Field>
       <Field><FieldLabel>{t('theme')}</FieldLabel><Options label={t('theme')} value={theme} onChange={v=>{setTheme(v);localStorage.setItem('rr.theme',v);themeApply(v)}} items={['system','light','dark'].map(v=>[v,t(v)])}/>{theme==='system'&&<FieldDescription>{t('currentSystem',{mode:t(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})}</FieldDescription>}</Field>
       <Separator/><Field><FieldLabel>{t('language')}</FieldLabel><Choice label={t('language')} value={i18n.language} onChange={v=>{localStorage.setItem('rr.language',v);void i18n.changeLanguage(v)}} items={[["zh-CN","简体中文"],["en","English"]]}/></Field><p className="helper info-line"><Info aria-hidden="true"/>{t('autoSaved')}</p>
