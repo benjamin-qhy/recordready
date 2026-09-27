@@ -8,6 +8,11 @@ static LAYOUT_READY: AtomicBool = AtomicBool::new(false);
 static EXIT_ALLOWED: AtomicBool = AtomicBool::new(false);
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
+extern "C" fn authorize_update_exit(allowed: i32) {
+    window_preferences::flush();
+    EXIT_ALLOWED.store(allowed != 0, Ordering::SeqCst);
+}
+
 extern "C" fn request_native_quit() {
     if let Some(app) = APP.get() { let app = app.clone();
         tauri::async_runtime::spawn(async move { let _ = show_settings(app, "quit".into(), None).await; }); }
@@ -27,6 +32,7 @@ extern "C" {
     fn rr_request(request: *const c_char, context: *mut c_void, callback: extern "C" fn(*mut c_void, *const c_char));
     fn rr_install_quit_guard(callback: extern "C" fn());
     fn rr_allow_quit();
+    fn rr_start_updater(callback: extern "C" fn(i32));
     fn rr_install_ui_callback(callback: extern "C" fn(*const c_char));
 }
 
@@ -59,7 +65,7 @@ async fn native_request(request: Value) -> Result<Value, String> {
 // DOM popovers cannot extend beyond their webview without a desktop-sized input window.
 #[tauri::command]
 async fn show_settings(app: tauri::AppHandle, section: String, anchor: Option<Vec<f64>>) -> Result<(), String> {
-    let allowed = ["camera", "audio", "appearance", "saveLocation", "results", "quit", "beauty"];
+    let allowed = ["camera", "audio", "appearance", "saveLocation", "results", "quit", "beauty", "updates"];
     if !allowed.contains(&section.as_str()) { return Err("unknown_section".into()); }
     let state = native_request(serde_json::json!({"action":"status"})).await?;
     let window = app.get_webview_window("settings").ok_or("missing_settings")?;
@@ -78,7 +84,7 @@ async fn show_settings(app: tauri::AppHandle, section: String, anchor: Option<Ve
     });
     let monitor=monitor.or_else(||monitors.iter().find(|m|m.position().x==0&&m.position().y==0)).or_else(||monitors.first());
     let bounds = monitor.map(|m| { let area=m.work_area();let p=area.position.to_logical::<f64>(m.scale_factor()); let z=area.size.to_logical::<f64>(m.scale_factor()); [p.x+12.0,p.y+12.0,z.width-24.0,z.height-24.0] }).unwrap_or([0.0,40.0,1200.0,720.0]);
-    let (w,h): (f64,f64) = match section.as_str() { "beauty"=>(380.0,640.0),"appearance"=>(240.0,350.0),"saveLocation"=>(240.0,290.0),"quit"=>(340.0,285.0),_=>(380.0,410.0) };
+    let (w,h): (f64,f64) = match section.as_str() { "updates"=>(380.0,410.0),"beauty"=>(380.0,640.0),"appearance"=>(240.0,350.0),"saveLocation"=>(240.0,290.0),"quit"=>(340.0,285.0),_=>(380.0,410.0) };
     let (w,h)=(w.min(bounds[2]),h.min(bounds[3]));
     let x=(anchor[0]+anchor[2]/2.0-w/2.0).clamp(bounds[0],bounds[0]+bounds[2]-w);
     let y=if anchor[1]-h-12.0>=bounds[1] {anchor[1]-h-12.0} else {(anchor[1]+anchor[3]+12.0).min(bounds[1]+bounds[3]-h).max(bounds[1])};
@@ -163,6 +169,7 @@ async fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
     if ["preparing", "countdown", "starting", "recording", "paused", "saving"].contains(&status["phase"].as_str().unwrap_or("")) {
         return Err("session_busy".into());
     }
+    native_request(serde_json::json!({"action":"update", "operation":"before-quit"})).await?;
     window_preferences::flush();
     EXIT_ALLOWED.store(true, Ordering::SeqCst);
     #[cfg(target_os = "macos")]
@@ -242,7 +249,7 @@ pub fn run() {
             let _ = APP.set(app.handle().clone());
             window_preferences::init(app.path().app_config_dir()?.join("window-positions.json"));
             #[cfg(target_os = "macos")]
-            unsafe { rr_install_quit_guard(request_native_quit); rr_install_ui_callback(request_native_settings); }
+            unsafe { rr_install_quit_guard(request_native_quit); rr_install_ui_callback(request_native_settings); rr_start_updater(authorize_update_exit); }
             if let Some(toolbar) = app.get_webview_window("main") {
                 let saved=window_preferences::get("main");
                 let monitors=toolbar.available_monitors()?;

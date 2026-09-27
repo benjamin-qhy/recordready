@@ -38,6 +38,7 @@ typealias Reply = @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>
 }
 @_cdecl("rr_allow_quit")
 @MainActor public func allowQuit() { quitDelegate?.allowed = true }
+@MainActor func revokeUpdateQuit() { quitDelegate?.allowed = false }
 
 final class CapturePanel: NSPanel {
     var coversFullDisplay = false
@@ -381,7 +382,11 @@ final class PreviewDragView: DragHandle {
     var region = CGRect.zero
     var displayID: CGDirectDisplayID = CGMainDisplayID()
     var screen: NSScreen { NSScreen.screens.first(where: { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID }) ?? NSScreen.screens[0] }
-    var locked: Bool { ["preparing", "countdown", "starting", "recording", "paused", "saving"].contains(phase) }
+    var updateGate = UpdateInstallationGate()
+    func reserveUpdateInstallation() -> Bool { updateGate.reserve(phase: phase) }
+    func releaseUpdateInstallation() { updateGate.release() }
+    var updateInstallationStillSafe: Bool { updateGate.reserved && ["idle", "ready", "saved", "partial", "failed"].contains(phase) }
+    var locked: Bool { updateGate.reserved || ["preparing", "countdown", "starting", "recording", "paused", "saving"].contains(phase) }
 
     func bestScreen(for rect:CGRect) -> NSScreen {
         NSScreen.screens.max(by: { a,b in
@@ -975,6 +980,9 @@ final class PreviewDragView: DragHandle {
     }
 
     func request(_ data: [String: Any]) async throws -> [String: Any] {
+        if updateGate.reserved && !["status", "update"].contains(data["action"] as? String ?? "") {
+            throw ProbeError.message("session_busy")
+        }
         switch data["action"] as? String {
         case "system-camera-effects":
             guard camera, engine?.session.isRunning == true else {throw ProbeError.message("camera_permission")}
@@ -988,6 +996,7 @@ final class PreviewDragView: DragHandle {
             if let e=engine {let settings=beautySettings;e.queue.async {e.beauty.settings=settings;e.beauty.oldParameters=nil}}
         case "beauty-compare":
             if let e=engine {let active=data["active"] as? Bool ?? false;e.queue.async {e.beautyCompare=active}}
+        case "update": return try updateRequest(data["operation"] as? String ?? "status")
         case "status": break
         case "restore-session":
             if !restoredSession {

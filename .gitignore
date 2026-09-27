@@ -7,3 +7,15 @@ node_modules/
 dist/
 target/
 *.log
+
+# Verified SDK and generated release artifacts (private keys live outside the repo)
+/desktop/vendor/sparkle/
+/desktop/vendor/.sparkle-*/
+/site/releases/
+/site/.dist
+/site/.release.lock/
+/site/.staging-*/
+/scripts/release/__pycache__/
+/site/.site-build-*/
+/site/.site-legacy-*/
+/site/.site-next-*/
