@@ -1,3 +1,4 @@
+import { UpdateSettings } from './components/UpdateSettings'
 import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
@@ -257,15 +258,16 @@ export default function App() {
   </main></TooltipProvider>
 
   return <TooltipProvider><div className="settings-shell"><main className={`settings settings-${tab}`} role={tab==='quit'?'alertdialog':'dialog'} aria-labelledby="settings-title" {...draggable}>
-    <header><h1 id="settings-title">{tab==='beauty'?(language==='zh-CN'?'美颜与补光':'Beauty & Lighting'):t(tab)}</h1><Button className="window-close" variant="ghost" size="icon" aria-label={t('close')} onClick={()=>void hide()}><X/></Button></header>
+    <header><h1 id="settings-title">{tab==='updates'?(language==='zh-CN'?'软件更新':'Software updates'):tab==='beauty'?(language==='zh-CN'?'美颜与补光':'Beauty & Lighting'):t(tab)}</h1><Button className="window-close" variant="ghost" size="icon" aria-label={t('close')} onClick={()=>void hide()}><X/></Button></header>
 
     {!desktop&&<Alert><AlertDescription>{t('nativeRequired')}</AlertDescription></Alert>}
     {errorPanel&&<Alert variant="destructive"><AlertCircle/><AlertTitle>{t('error')}</AlertTitle><AlertDescription>{t(errorPanel,{defaultValue:errorPanel})}</AlertDescription></Alert>}
     {locked&&!['appearance','quit','results','script'].includes(tab)&&<p className="helper">{t('locked')}</p>}
+    {tab==='updates'&&<UpdateSettings zh={language==='zh-CN'} locked={locked}/>}
     {tab==='beauty'&&state.beauty&&<BeautySettings initial={state.beauty} available={state.systemCameraEffectsAvailable??false} zh={language==='zh-CN'}/>}
     {tab==='appearance'&&<FieldGroup><Field><FieldLabel>{t('display')}</FieldLabel><Choice label={t('display')} value={state.displayID??''} disabled={locked} onChange={displayID=>void run('configure',{displayID})} items={deviceItems('displays',state.displayID??'')}/></Field>
       <Field><FieldLabel>{t('theme')}</FieldLabel><Options label={t('theme')} value={theme} onChange={v=>{setTheme(v);localStorage.setItem('rr.theme',v);themeApply(v)}} items={['system','light','dark'].map(v=>[v,t(v)])}/>{theme==='system'&&<FieldDescription>{t('currentSystem',{mode:t(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})}</FieldDescription>}</Field>
-      <Separator/><Field><FieldLabel>{t('language')}</FieldLabel><Choice label={t('language')} value={i18n.language} onChange={v=>{localStorage.setItem('rr.language',v);void i18n.changeLanguage(v)}} items={[["zh-CN","简体中文"],["en","English"]]}/></Field><p className="helper info-line"><Info aria-hidden="true"/>{t('autoSaved')}</p>
+      <Separator/><Field><FieldLabel>{t('language')}</FieldLabel><Choice label={t('language')} value={i18n.language} onChange={v=>{localStorage.setItem('rr.language',v);void i18n.changeLanguage(v)}} items={[["zh-CN","简体中文"],["en","English"]]}/></Field><p className="helper info-line"><Info aria-hidden="true"/>{t('autoSaved')}</p><Separator/><UpdateSettings zh={language==='zh-CN'} locked={locked} compact/>
     </FieldGroup>}
     {tab==='saveLocation'&&<FieldGroup><Field><FieldLabel>{t('saveLocation')}</FieldLabel><p className="helper save-path" title={state.directory}>{state.directory}</p><Button variant="outline" disabled={locked||!desktop} onClick={async()=>{const path=await open({directory:true,multiple:false});if(path)await run('configure',{directory:path})}}>{t('choose')}</Button></Field><Button variant="outline" disabled={!desktop} onClick={()=>void run('open-folder',{current:true})}><FolderOpen data-icon="inline-start"/>{t('openFolder')}</Button><p className="helper">{t('saveHelp')}</p></FieldGroup>}
     {tab==='results'&&<FieldGroup>
