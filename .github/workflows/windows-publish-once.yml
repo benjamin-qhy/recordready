@@ -20,8 +20,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
       - name: Check publisher and manifest tests
         run: |
+          pnpm --dir desktop/windows install --frozen-lockfile --ignore-scripts
           node --test desktop/windows/tests/*.test.mjs
           python3 scripts/release/deploy-remote.test.py
           python3 scripts/release/deploy-windows-remote.test.py
@@ -35,7 +39,7 @@ jobs:
             --dir desktop/windows/release/published/0.1.0-windows.6
       - name: Verify source, signature and installation package
         run: |
-          node -e 'const fs=require("fs");const p="desktop/windows/release/published/0.1.0-windows.6/inventory.json";const i=JSON.parse(fs.readFileSync(p));if(i.sourceCommit!==process.env.GITHUB_SHA||i.workingTree)throw Error("release_source_mismatch");const pub=fs.readFileSync("desktop/windows/resources/update-public-key.txt","utf8").trim();fs.writeFileSync("desktop/windows/resources/update-config.json",JSON.stringify({feedUrl:"https://recordready.qiushui.me/updates/windows/x64/release.json",publicKey:pub}));'
+          node -e 'const fs=require("fs"),cp=require("child_process");const p="desktop/windows/release/published/0.1.0-windows.6/inventory.json";const i=JSON.parse(fs.readFileSync(p));if(i.workingTree)throw Error("release_dirty_source");cp.execFileSync("git",["merge-base","--is-ancestor",i.sourceCommit,process.env.GITHUB_SHA]);const changed=cp.execFileSync("git",["diff","--name-only",i.sourceCommit,process.env.GITHUB_SHA],{encoding:"utf8"}).trim().split(/\r?\n/).filter(Boolean);if(changed.some(p=>p!==".github/workflows/windows-publish-once.yml"))throw Error("release_source_changed");const pub=fs.readFileSync("desktop/windows/resources/update-public-key.txt","utf8").trim();fs.writeFileSync("desktop/windows/resources/update-config.json",JSON.stringify({feedUrl:"https://recordready.qiushui.me/updates/windows/x64/release.json",publicKey:pub}));'
           node desktop/windows/deploy.mjs 0.1.0-windows.6 --prepare-only
       - name: Publish with pinned server identity
         env:
