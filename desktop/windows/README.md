@@ -1,6 +1,6 @@
 # RecordReady Windows
 
-Windows x64 实现和内测发布入口，跟踪 [Issue #20](https://github.com/benjamin-qhy/recordready/issues/20)。当前候选包为 0.1.0-windows.5。架构与支持边界见 [ADR-0002](../../docs/adr/0002-windows-electron-signed-updates.md)。
+Windows x64 实现和内测发布入口，跟踪 [Issue #20](https://github.com/benjamin-qhy/recordready/issues/20)。当前发布版本为 0.1.0-windows.6。架构与支持边界见 [ADR-0002](../../docs/adr/0002-windows-electron-signed-updates.md)。
 
 ## 构建
 
@@ -25,8 +25,8 @@ node node_modules/electron-builder/cli.js --config electron-builder.json --win n
 版本由本目录 package.json 管理，与 macOS 版本分开递增。包、sidecar blockmap 和签名清单在最终打包后生成；现有版本不可重用。安装包没有 Authenticode 发布者证书，Ed25519 更新签名不能替代 Windows 发布者身份。
 
 ```powershell
-node release.mjs sign 0.1.0-windows.5
-node deploy.mjs 0.1.0-windows.5 --prepare-only
+node release.mjs sign 0.1.0-windows.6
+node deploy.mjs 0.1.0-windows.6 --prepare-only
 ```
 
 ## 验证
@@ -48,17 +48,17 @@ python scripts/release/deploy-remote.test.py
 
 ## 发布
 
-发布目标限定为 `root@39.96.16.242:/srv/recordready`。设置环境变量为已有 SSH 私钥路径和已验证的 known_hosts 路径；不接受聊天明文密码、跳过主机认证或降级公网 HTTP。
+发布目标限定为 `root@39.96.16.242:/srv/recordready`。设置环境变量为已有 SSH 私钥路径和已验证的 known_hosts 路径；不跳过主机认证或降级公网 HTTP。
 
 ```powershell
 $env:RECORDREADY_SSH_IDENTITY = '本机已有私钥的绝对路径'
 $env:RECORDREADY_SSH_KNOWN_HOSTS = '可信 known_hosts 的绝对路径'
-node desktop/windows/deploy.mjs 0.1.0-windows.5
+node desktop/windows/deploy.mjs 0.1.0-windows.6
 ```
 
 先发布并安装首个版本，再发布递增版，以真实 HTTPS 源完成应用内下载、延后、忙碌保护、确认安装和自动重启验证。下载页为 `/windows/`，归档为 `/releases/windows/<version>/`。更新目录包含完整包与 blockmap 链接，供旧缓存差分和全量回退。
 
-发布脚本保留 macOS 内容，逐文件验哈希后切换站点；不可变归档已到位但切换失败时，同一字节内容可重新上传重试，不能改包复用版本。既有站点部署成功、Windows 主机/网络验收成功是分别记录的条件。当前尚未取得可用 SSH 登录，不能把本地候选包写成已上线。4K 竖屏在验收 GPU 上需 CPU 画布，帧率偏低；当前不承诺 4K 30fps。
+发布脚本保留 macOS 内容，逐文件验哈希后切换站点；不可变归档已到位但切换失败时，同一字节内容可重新上传重试，不能改包复用版本。`.6` 的一次性 CI 工作流从 GitHub Release 下载本机签名的不可变产物，核对来源提交、签名和哈希后部署，并重新下载公网安装包核对哈希。更新私钥不传入 CI；临时 SSH 凭据仅供该次工作流使用。4K 竖屏在验收 GPU 上需 CPU 画布，帧率偏低；当前不承诺 4K 30fps。
 
 ## 源码入口
 

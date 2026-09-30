@@ -1,0 +1,61 @@
+name: Publish Windows 0.1.0-windows.6
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recordready-windows-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check publisher and manifest tests
+        run: |
+          node --test desktop/windows/tests/*.test.mjs
+          python3 scripts/release/deploy-remote.test.py
+          python3 scripts/release/deploy-windows-remote.test.py
+      - name: Download immutable signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p desktop/windows/release/published/0.1.0-windows.6
+          gh release download windows-v0.1.0-windows.6 \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir desktop/windows/release/published/0.1.0-windows.6
+      - name: Verify source, signature and installation package
+        run: |
+          node -e 'const fs=require("fs");const p="desktop/windows/release/published/0.1.0-windows.6/inventory.json";const i=JSON.parse(fs.readFileSync(p));if(i.sourceCommit!==process.env.GITHUB_SHA||i.workingTree)throw Error("release_source_mismatch");const pub=fs.readFileSync("desktop/windows/resources/update-public-key.txt","utf8").trim();fs.writeFileSync("desktop/windows/resources/update-config.json",JSON.stringify({feedUrl:"https://recordready.qiushui.me/updates/windows/x64/release.json",publicKey:pub}));'
+          node desktop/windows/deploy.mjs 0.1.0-windows.6 --prepare-only
+      - name: Publish with pinned server identity
+        env:
+          DEPLOY_KEY: ${{ secrets.RECORDREADY_CI_DEPLOY_KEY }}
+          RECORDREADY_SSH_KNOWN_HOSTS: ${{ github.workspace }}/.github/recordready-known-hosts
+        run: |
+          test -n "$DEPLOY_KEY"
+          key="$RUNNER_TEMP/recordready-deploy-key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          export RECORDREADY_SSH_IDENTITY="$key"
+          node desktop/windows/deploy.mjs 0.1.0-windows.6
+      - name: Verify public HTTPS feed and full installer
+        run: |
+          curl --fail --silent --show-error --location \
+            https://recordready.qiushui.me/updates/windows/x64/release.json \
+            -o "$RUNNER_TEMP/live-release.json"
+          cmp desktop/windows/release/published/0.1.0-windows.6/release.json "$RUNNER_TEMP/live-release.json"
+          curl --fail --silent --show-error --location \
+            https://recordready.qiushui.me/releases/windows/0.1.0-windows.6/RecordReady-0.1.0-windows.6-x64.exe \
+            -o "$RUNNER_TEMP/live-installer.exe"
+          node -e 'const fs=require("fs"),crypto=require("crypto");const i=JSON.parse(fs.readFileSync("desktop/windows/release/published/0.1.0-windows.6/inventory.json"));const f=i.files["RecordReady-0.1.0-windows.6-x64.exe"];const p=process.env.RUNNER_TEMP+"/live-installer.exe";if(fs.statSync(p).size!==f.bytes||crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex")!==f.sha256)throw Error("live_installer_mismatch");console.log("Public HTTPS installer hash verified");'
