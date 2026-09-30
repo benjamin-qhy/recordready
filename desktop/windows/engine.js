@@ -44,9 +44,9 @@ async function start(next){
    recorder.onerror=e=>{writeFailure=Error(e.error?.message||'encoder_failed');report({error:writeFailure.message,fatal:true})};
    recorders.push(entry);recorder.start(500);
   };
-  create('screen',canvasStream.getVideoTracks());if(config.camera)create('camera',cameraStream.getVideoTracks());
+  const startedAt=Date.now();create('screen',canvasStream.getVideoTracks());if(config.camera)create('camera',cameraStream.getVideoTracks());
   let warmup;try{await Promise.race([Promise.all(recorders.map(r=>r.ready)),new Promise((_,reject)=>warmup=setTimeout(()=>reject(Error('mp4_encoder_no_output')),15000))]);}finally{clearTimeout(warmup);}
-  return {cameraPixels:cameraStream?[camera.videoWidth,camera.videoHeight]:undefined};
+  return {startedAt,cameraPixels:cameraStream?[camera.videoWidth,camera.videoHeight]:undefined};
  }catch(e){await stop().catch(()=>{});throw e;}
 }
 async function stop(){

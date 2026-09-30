@@ -37,7 +37,7 @@ async function beginCapture(){
   sessionDirectory=join(config.directory,sessionName());mkdirSync(sessionDirectory,{recursive:true});
   files=new RecordingFiles(sessionDirectory);await files.create(['screen',...(config.camera?['camera']:[])]);
   const result=await engine('start',{...config,region,displayBounds:display.bounds,sourceID:source.id,outputPixels:outputSize(config),cameraBounds:windows.engine.getBounds(),token});
-  state.phase='recording';state.started=Date.now();state.result={outputPixels:outputSize(config),cameraOutputPixels:result.cameraPixels};layout();log('recording-started',{directory:sessionDirectory,output:outputSize(config)});
+  state.phase='recording';state.started=result.startedAt;state.result={outputPixels:outputSize(config),cameraOutputPixels:result.cameraPixels};layout();log('recording-started',{directory:sessionDirectory,output:outputSize(config)});
  }catch(e){await engine('stop').catch(()=>{});await closeHandles();state.phase='failed';state.error=e.message;state.result.fatalError=e.message;layout();log('recording-failed',e.message);}
 }
 async function stop(fatal=''){

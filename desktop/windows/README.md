@@ -1,6 +1,6 @@
 # RecordReady Windows
 
-Windows x64 实现和内测发布入口，跟踪 [Issue #20](https://github.com/benjamin-qhy/recordready/issues/20)。当前候选包为 0.1.0-windows.4。架构与支持边界见 [ADR-0002](../../docs/adr/0002-windows-electron-signed-updates.md)。
+Windows x64 实现和内测发布入口，跟踪 [Issue #20](https://github.com/benjamin-qhy/recordready/issues/20)。当前候选包为 0.1.0-windows.5。架构与支持边界见 [ADR-0002](../../docs/adr/0002-windows-electron-signed-updates.md)。
 
 ## 构建
 
@@ -25,8 +25,8 @@ node node_modules/electron-builder/cli.js --config electron-builder.json --win n
 版本由本目录 package.json 管理，与 macOS 版本分开递增。包、sidecar blockmap 和签名清单在最终打包后生成；现有版本不可重用。安装包没有 Authenticode 发布者证书，Ed25519 更新签名不能替代 Windows 发布者身份。
 
 ```powershell
-node release.mjs sign 0.1.0-windows.4
-node deploy.mjs 0.1.0-windows.4 --prepare-only
+node release.mjs sign 0.1.0-windows.5
+node deploy.mjs 0.1.0-windows.5 --prepare-only
 ```
 
 ## 验证
@@ -53,7 +53,7 @@ python scripts/release/deploy-remote.test.py
 ```powershell
 $env:RECORDREADY_SSH_IDENTITY = '本机已有私钥的绝对路径'
 $env:RECORDREADY_SSH_KNOWN_HOSTS = '可信 known_hosts 的绝对路径'
-node desktop/windows/deploy.mjs 0.1.0-windows.4
+node desktop/windows/deploy.mjs 0.1.0-windows.5
 ```
 
 先发布并安装首个版本，再发布递增版，以真实 HTTPS 源完成应用内下载、延后、忙碌保护、确认安装和自动重启验证。下载页为 `/windows/`，归档为 `/releases/windows/<version>/`。更新目录包含完整包与 blockmap 链接，供旧缓存差分和全量回退。
