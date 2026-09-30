@@ -1,0 +1,7 @@
+import {build} from 'esbuild';import {createRequire} from 'node:module';import {randomBytes,generateKeyPairSync} from 'node:crypto';import {mkdirSync,writeFileSync} from 'node:fs';import {resolve,join} from 'node:path';import {spawn} from 'node:child_process';import electron from 'electron';
+const require=createRequire(import.meta.url),builderRequire=createRequire(require.resolve('electron-builder')),{buildBlockMap}=builderRequire('app-builder-lib/out/targets/blockmap/blockmap.js');
+const root=resolve(import.meta.dirname,'.validation/network');mkdirSync(root,{recursive:true});const old=randomBytes(8*1024*1024),next=Buffer.concat([old.subarray(0,500000),randomBytes(20000),old.subarray(500000)]);
+for(const [v,bytes] of [['1',old],['2',next]]){const path=join(root,`RecordReady-0.1.0-windows.${v}-x64.exe`);writeFileSync(path,bytes);await buildBlockMap(path,'gzip',path+'.blockmap');}
+const keys=generateKeyPairSync('ed25519');writeFileSync(join(root,'test-key.pem'),keys.privateKey.export({type:'pkcs8',format:'pem'}));writeFileSync(join(root,'package.json'),JSON.stringify({name:'recordready-network-test',version:'0.1.0-windows.1',main:'main.cjs'}));
+await build({entryPoints:[resolve(import.meta.dirname,'test-network-main.mjs')],outfile:join(root,'main.cjs'),bundle:true,platform:'node',format:'cjs',external:['electron','electron-updater/*']});
+const child=spawn(electron,[root],{stdio:'inherit',windowsHide:true});child.once('exit',code=>process.exitCode=code??1);

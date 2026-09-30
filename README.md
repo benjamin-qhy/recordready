@@ -2,7 +2,13 @@
 
 口播录制工具。
 
-当前交付为需求方案与浏览器交互原型，尚未实现真实 Tauri 录制。
+当前已有真实 macOS 录制工程及线上内测版；Windows x64 录制、安装与签名增量更新候选版已实现，服务器发布与剩余实机验收仍待完成。
+
+- [macOS 工程与验证](desktop/README.md)
+- [Windows 工程、构建与发布](desktop/windows/README.md)
+- [Windows 当前验收记录](docs/implementation/2026-09-30-windows-validation.md)
+
+以下为早期浏览器交互原型，其模拟状态不代表当前桌面工程。
 
 ## 第一期：单一极简录制界面
 

@@ -1,0 +1,10 @@
+{
+  "appId": "com.recordready.desktop.windows",
+  "productName": "RecordReady",
+  "directories": {"output":"release"},
+  "files": ["dist/**", "package.json"],
+  "extraResources": [{"from":"resources/update-config.json","to":"update-config.json"},{"from":"resources/update-runner.exe","to":"update-runner.exe"}],
+  "win": {"target":["nsis"],"icon":"../src-tauri/icons/icon.ico","signExecutable":false,"artifactName":"RecordReady-${version}-x64.exe"},
+  "nsis": {"oneClick":false,"perMachine":false,"allowToChangeInstallationDirectory":true,"deleteAppDataOnUninstall":false,"useZip":true,"differentialPackage":false,"runAfterFinish":false},
+  "publish": {"provider":"generic","url":"https://recordready.qiushui.me/updates/windows/x64/","updaterCacheDirName":"recordready-windows-updater"}
+}

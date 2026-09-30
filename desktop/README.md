@@ -1,5 +1,7 @@
 # RecordReady desktop
 
+Windows x64 版本位于 [windows/README.md](windows/README.md)，采用独立 Electron 宿主复用 React 界面；其安装包、更新源和验证状态单独记录。下文为既有 macOS 工程说明。
+
 Mac 第一阶段正式工程。2026-09-25 用户授权开始；使用 Tauri 2、React、TypeScript、shadcn/ui（Radix）、Tailwind CSS、i18next，以及同进程 Swift 原生模块。
 
 ## 运行与验证

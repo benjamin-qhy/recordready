@@ -1,0 +1,9 @@
+import {open,link,unlink,copyFile} from 'node:fs/promises';import {constants} from 'node:fs';import {join} from 'node:path';
+import {validateMP4} from './mp4.mjs';
+export class RecordingFiles{
+ constructor(directory){this.directory=directory;this.files=new Map();}
+ async create(names){try{for(const name of names){if(!['screen','camera'].includes(name))throw Error('invalid_output_name');const handle=await open(join(this.directory,name+'.partial.mp4'),'wx');this.files.set(name,{handle,queue:Promise.resolve(),bytes:0,error:''});}}catch(e){await this.close();throw e;}}
+ async write(name,bytes){const file=this.files.get(name);if(!file)throw Error('invalid_recording_stream');file.queue=file.queue.then(async()=>{const data=Buffer.from(bytes);let offset=0;while(offset<data.length){const {bytesWritten}=await file.handle.write(data,offset,data.length-offset);if(!bytesWritten)throw Error('disk_write_failed');offset+=bytesWritten;}file.bytes+=offset;});try{await file.queue;}catch(e){file.error=e.message;throw e;}}
+ async close(){for(const file of this.files.values()){try{await file.queue;await file.handle.sync();}catch(e){file.error=e.message;}finally{try{await file.handle.close()}catch(e){file.error=file.error||e.message;}}}}
+ async finish(validNames){await this.close();const result={};for(const [name,file] of this.files){try{if(file.error||!file.bytes||!validNames.includes(name))throw Error(file.error||'incomplete_recording');const source=join(this.directory,name+'.partial.mp4'),target=join(this.directory,name+'.mp4');await validateMP4(source);try{await link(source,target);}catch(e){if(!['ENOTSUP','EPERM','EXDEV'].includes(e.code))throw e;await copyFile(source,target,constants.COPYFILE_EXCL);const committed=await open(target,'r+');try{await committed.sync();}finally{await committed.close();}}await unlink(source);result[name]='saved';}catch(e){result[name]=e.message;}}return result;}
+}

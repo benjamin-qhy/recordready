@@ -32,6 +32,6 @@ export interface Snapshot {
   phase: Phase; error: string; remaining: number; elapsed: number;
   width: number; height: number; camera: boolean; microphone: boolean;
   playing: boolean; fontSize?: number; promptSpeed?: number; level?: number; directory: string; devices: {camera: string; microphone: string};
-  result: { saveResults?: Record<string,string>; fatalError?: string; outputPixels?: number[]; cameraOutputPixels?: number[]; screen?: {lastVideoPTS?:number}; camera?: {lastVideoPTS?:number} }
+  result: { duration?: number; saveResults?: Record<string,string>; fatalError?: string; outputPixels?: number[]; cameraOutputPixels?: number[]; screen?: {lastVideoPTS?:number}; camera?: {lastVideoPTS?:number} }
 }
 export const initial: Snapshot = {phase:'idle', error:'', remaining:0, elapsed:0, width:1080,height:1920,camera:false,microphone:false,playing:false,directory:'',devices:{camera:'',microphone:''},result:{}}

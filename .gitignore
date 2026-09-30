@@ -7,6 +7,14 @@ node_modules/
 dist/
 target/
 *.log
+/desktop/windows/release/
+/desktop/windows/resources/update-config.json
+/desktop/windows/resources/*.exe
+/desktop/windows/resources/*.obj
+/desktop/windows/resources/compile.cmd
+/desktop/windows/evidence/
+/desktop/windows/.validation/
+/desktop/pnpm-lock.yaml
 
 # Verified SDK and generated release artifacts (private keys live outside the repo)
 /desktop/vendor/sparkle/
