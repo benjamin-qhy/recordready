@@ -77,3 +77,11 @@ MP4 经 FFmpeg 全量解码检查视频和音轨，核对输出尺寸，并独�
 ## 真实 HTTPS 升级闭环完成
 
 2026-09-30 09:13 UTC，旧版 `.4` 完成生产 HTTPS 检查和差分下载、签名与载荷验证、延后、忙碌拒绝安装、用户原生确认、退出、NSIS 安装、自动重启到 `.5`。此前分段助手验收的缺口已补齐。初次重启核对恰逢安装未结束，控制端口暂不可用；安装结束后重新核对通过。测试入口的隐藏启动是确认框不可见的原因，正常交互验收应以可见方式启动。Windows 11、DPI/多显示器、物理同步和 4K 30fps 的未验事项仍保留。
+
+## 2026-10-01 CI 发布 `.6`
+
+- 源码 `151b11797f5a2889dbb74a55e6268e2e3c0d99c5` 的签名产物上传至 [GitHub Release](https://github.com/benjamin-qhy/recordready/releases/tag/windows-v0.1.0-windows.6)。安装包 154,274,714 字节，SHA-256 `646ea57dff5760e0e5489aec1925e3d7ee09996e5a5e7dd0610c4d172e3264a2`。
+- [一次性 CI 运行](https://github.com/benjamin-qhy/recordready/actions/runs/36793140701) 通过：回归测试、签名及来源提交核对、SSH 原子发布、生产 HTTPS 清单与完整安装包重新下载和哈希核对。
+- 公网 `/windows/` 与更新源指向 `.6`，macOS appcast SHA-256 仍为 `5b321574991042f6e28cebda36ca089a3040bb77aeb30ff06b64eccc79b888f7`。
+- CI 临时 SSH 公钥与 GitHub Actions 密钥已撤销，一次性发布工作流已停用；常规 Windows 回归工作流继续启用。先前两次 CI 尝试分别停于来源历史校验和发布器路径错误，均未切换站点。
+- `.6` 与 `.5` 的录制代码相同，仅递增版本；此前 `.4 → .5` 的客户端升级全链路仍是原生交互验收证据。Windows 11、物理同步和 4K 30fps 未验事项保持开放。
