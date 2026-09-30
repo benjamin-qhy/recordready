@@ -1,0 +1,10 @@
+import {build as bundle} from 'esbuild';
+import {build} from '../node_modules/vite/dist/node/index.js';
+import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('..',import.meta.url)),here=fileURLToPath(new URL('.',import.meta.url));
+await mkdir(here+'dist',{recursive:true});
+await build({root,configFile:root+'/vite.config.ts',base:'./',resolve:{alias:[...['@tauri-apps/api/core','@tauri-apps/api/window','@tauri-apps/api/event','@tauri-apps/plugin-dialog'].map(find=>({find,replacement:here+'adapter.ts'}))]},build:{outDir:here+'dist/ui',emptyOutDir:true}});
+const html=await readFile(here+'dist/ui/index.html','utf8');await writeFile(here+'dist/ui/index.html',html.replace('<head>',`<head><meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data:;connect-src 'self';object-src 'none';base-uri 'none'">`));
+await bundle({entryPoints:[here+'main.mjs'],outfile:here+'dist/main.cjs',bundle:true,platform:'node',format:'cjs',external:['electron','electron-updater','electron-updater/*']});
+for(const name of ['preload.cjs','engine.js','engine.html'])await cp(here+name,here+'dist/'+name);

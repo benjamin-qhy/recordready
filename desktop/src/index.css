@@ -266,3 +266,6 @@ html[data-view=region],html[data-view=region] body { overflow:hidden; }
 .region-panel.region-config-toolbar .region-error {top:78px}
 
 .region-config-toolbar .quality-divider {height:24px;flex:0 0 1px;margin-inline:3px}
+/* Electron Windows hosts use native drag regions; interactive controls stay clickable. */
+body[data-windows] .main-panel, body[data-windows] .settings header { -webkit-app-region: drag; }
+body[data-windows] button, body[data-windows] input, body[data-windows] select, body[data-windows] textarea, body[data-windows] [role] { -webkit-app-region: no-drag; }

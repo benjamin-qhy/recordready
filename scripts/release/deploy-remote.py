@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import shutil
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -76,11 +77,21 @@ def publish(base, deployment_id, files):
         target = base / 'releases' / release['version']
         if not target.exists():
             (stage / 'releases' / release['version']).rename(target)
+    # A macOS release must preserve the independently published Windows channel.
+    if (live / 'updates/windows').is_dir():
+        shutil.copytree(live / 'updates/windows', stage / 'web/updates/windows', symlinks=True, dirs_exist_ok=True)
+        shutil.copytree(live / 'windows', stage / 'web/windows', symlinks=True, dirs_exist_ok=True)
+        for filename in ('index.html', 'download.html'):
+            page = stage / 'web' / filename
+            if page.exists():
+                html = page.read_text()
+                if 'id="windows-download"' not in html:
+                    page.write_text(html.replace('<main>', '<main><p id="windows-download"><a class="button secondary" href="/windows/">下载 Windows 内测版 / Windows beta</a></p>', 1))
     snapshot = base / 'snapshots' / deployment_id
     (stage / 'web').rename(snapshot)
-    (snapshot / 'releases').symlink_to('../../releases', target_is_directory=True)
+    (snapshot / 'releases').symlink_to(Path('..') / '..' / 'releases', target_is_directory=True)
     pointer = base / ('site-next-' + deployment_id)
-    pointer.symlink_to('snapshots/' + deployment_id, target_is_directory=True)
+    pointer.symlink_to(Path('snapshots') / deployment_id, target_is_directory=True)
     # One atomic swap publishes HTML, catalog and feed together; older snapshots remain recoverable.
     os.replace(pointer, live)
     return catalog[0]['version']
